@@ -1,0 +1,1216 @@
+{
+  "implementation": "nsh-rust",
+  "scenario": "interaction",
+  "startup_first_frame_ms": 214.632903,
+  "peak_footprint_mb": 0.0,
+  "phases": [
+    {
+      "name": "warmup",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.000291718,
+      "fps": 0.0,
+      "draw_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "dirty_to_draw_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 0.257274982752193,
+      "footprint_mb": 0.0,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": [],
+      "counters": [
+        [
+          "eng_wakes",
+          714
+        ],
+        [
+          "eng_busy_ns",
+          905971
+        ],
+        [
+          "eng_tasks_ns",
+          470638
+        ],
+        [
+          "eng_commit_ns",
+          318680
+        ],
+        [
+          "eng_commit_js_ns",
+          30944
+        ],
+        [
+          "eng_apply_ops_ns",
+          10482
+        ],
+        [
+          "eng_ops",
+          0
+        ],
+        [
+          "eng_submits",
+          0
+        ],
+        [
+          "eng_items",
+          0
+        ],
+        [
+          "core_rounds",
+          714
+        ],
+        [
+          "core_layout_skipped",
+          0
+        ],
+        [
+          "core_render_ns",
+          56970
+        ],
+        [
+          "core_flush_ns",
+          21728
+        ],
+        [
+          "core_layout_ns",
+          0
+        ],
+        [
+          "core_layout_main",
+          0
+        ],
+        [
+          "core_emit_ns",
+          0
+        ],
+        [
+          "core_lists_ns",
+          19850
+        ],
+        [
+          "core_text_ns",
+          19381
+        ],
+        [
+          "rx_computations",
+          0
+        ],
+        [
+          "it_frame",
+          0
+        ],
+        [
+          "it_style",
+          0
+        ],
+        [
+          "it_text",
+          0
+        ],
+        [
+          "it_create",
+          0
+        ],
+        [
+          "it_insert",
+          0
+        ],
+        [
+          "it_remove",
+          0
+        ],
+        [
+          "it_other",
+          0
+        ],
+        [
+          "ui_drains",
+          0
+        ],
+        [
+          "ui_drain_ns",
+          0
+        ],
+        [
+          "ui_batches",
+          0
+        ],
+        [
+          "ui_tick_ns",
+          0
+        ],
+        [
+          "ui_anim_write_ns",
+          0
+        ],
+        [
+          "ui_paint_ns",
+          0
+        ],
+        [
+          "ui_paints",
+          0
+        ],
+        [
+          "ui_notifies",
+          0
+        ]
+      ],
+      "frame_link": {
+        "probe": true,
+        "verified_ms": null,
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 0,
+        "dropped_at_begin": 0,
+        "pending_at_end": 0
+      }
+    },
+    {
+      "name": "select_row",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.000219909,
+      "fps": 9.299795489127378,
+      "draw_ms": {
+        "n": 94,
+        "p50": 0.625773,
+        "p95": 1.169107,
+        "p99": 2.7770249999999996,
+        "max": 3.0507440000000003
+      },
+      "dirty_to_draw_ms": {
+        "n": 94,
+        "p50": 0.626255,
+        "p95": 1.169741,
+        "p99": 2.7781260000000003,
+        "max": 3.0517510000000003
+      },
+      "tick_to_frame_ms": {
+        "n": 49,
+        "p50": 2.64913,
+        "p95": 7.182103,
+        "p99": 8.845704,
+        "max": 8.845704
+      },
+      "late_frames": 0,
+      "cpu_pct": 1.9805464460011604,
+      "footprint_mb": 0.0,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 49,
+      "compute_ms": [],
+      "threads_cpu_pct": [
+        [
+          "nsh-engine",
+          0.9999780095835891
+        ],
+        [
+          "bench-nsh",
+          0.799982407666871
+        ]
+      ],
+      "counters": [
+        [
+          "eng_wakes",
+          2395
+        ],
+        [
+          "eng_busy_ns",
+          80439697
+        ],
+        [
+          "eng_tasks_ns",
+          38100122
+        ],
+        [
+          "eng_commit_ns",
+          41555491
+        ],
+        [
+          "eng_commit_js_ns",
+          135437
+        ],
+        [
+          "eng_apply_ops_ns",
+          40272
+        ],
+        [
+          "eng_ops",
+          0
+        ],
+        [
+          "eng_submits",
+          50
+        ],
+        [
+          "eng_items",
+          3037
+        ],
+        [
+          "core_rounds",
+          2395
+        ],
+        [
+          "core_layout_skipped",
+          0
+        ],
+        [
+          "core_render_ns",
+          4553346
+        ],
+        [
+          "core_flush_ns",
+          3973077
+        ],
+        [
+          "core_layout_ns",
+          29417026
+        ],
+        [
+          "core_layout_main",
+          50
+        ],
+        [
+          "core_emit_ns",
+          302620
+        ],
+        [
+          "core_lists_ns",
+          493041
+        ],
+        [
+          "core_text_ns",
+          1950045
+        ],
+        [
+          "rx_computations",
+          8360
+        ],
+        [
+          "it_frame",
+          751
+        ],
+        [
+          "it_style",
+          99
+        ],
+        [
+          "it_text",
+          1943
+        ],
+        [
+          "it_create",
+          120
+        ],
+        [
+          "it_insert",
+          120
+        ],
+        [
+          "it_remove",
+          4
+        ],
+        [
+          "it_other",
+          0
+        ],
+        [
+          "ui_drains",
+          50
+        ],
+        [
+          "ui_drain_ns",
+          5428564
+        ],
+        [
+          "ui_batches",
+          50
+        ],
+        [
+          "ui_tick_ns",
+          0
+        ],
+        [
+          "ui_anim_write_ns",
+          8485
+        ],
+        [
+          "ui_paint_ns",
+          0
+        ],
+        [
+          "ui_paints",
+          0
+        ],
+        [
+          "ui_notifies",
+          0
+        ]
+      ],
+      "frame_link": {
+        "probe": true,
+        "verified_ms": {
+          "n": 49,
+          "p50": 2.64913,
+          "p95": 7.182103,
+          "p99": 8.845704,
+          "max": 8.845704
+        },
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 0,
+        "dropped_at_begin": 0,
+        "pending_at_end": 0
+      }
+    },
+    {
+      "name": "switch_tab",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.000113655,
+      "fps": 2.5999704500358503,
+      "draw_ms": {
+        "n": 25,
+        "p50": 3.9149809999999996,
+        "p95": 4.557953,
+        "p99": 4.80166,
+        "max": 4.80166
+      },
+      "dirty_to_draw_ms": {
+        "n": 25,
+        "p50": 3.915613,
+        "p95": 4.5586,
+        "p99": 4.802486,
+        "max": 4.802486
+      },
+      "tick_to_frame_ms": {
+        "n": 24,
+        "p50": 22.239151,
+        "p95": 25.932913,
+        "p99": 30.454214,
+        "max": 30.454214
+      },
+      "late_frames": 0,
+      "cpu_pct": 4.560238170613071,
+      "footprint_mb": 0.0,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 24,
+      "compute_ms": [],
+      "threads_cpu_pct": [
+        [
+          "nsh-engine",
+          2.499971586572933
+        ],
+        [
+          "bench-nsh",
+          2.0999761327212636
+        ]
+      ],
+      "counters": [
+        [
+          "eng_wakes",
+          2183
+        ],
+        [
+          "eng_busy_ns",
+          235436539
+        ],
+        [
+          "eng_tasks_ns",
+          7541659
+        ],
+        [
+          "eng_commit_ns",
+          227202985
+        ],
+        [
+          "eng_commit_js_ns",
+          132718
+        ],
+        [
+          "eng_apply_ops_ns",
+          38255
+        ],
+        [
+          "eng_ops",
+          0
+        ],
+        [
+          "eng_submits",
+          25
+        ],
+        [
+          "eng_items",
+          75194
+        ],
+        [
+          "core_rounds",
+          2183
+        ],
+        [
+          "core_layout_skipped",
+          0
+        ],
+        [
+          "core_render_ns",
+          52604929
+        ],
+        [
+          "core_flush_ns",
+          3916250
+        ],
+        [
+          "core_layout_ns",
+          160994614
+        ],
+        [
+          "core_layout_main",
+          25
+        ],
+        [
+          "core_emit_ns",
+          410214
+        ],
+        [
+          "core_lists_ns",
+          47658
+        ],
+        [
+          "core_text_ns",
+          8418625
+        ],
+        [
+          "rx_computations",
+          1168
+        ],
+        [
+          "it_frame",
+          15121
+        ],
+        [
+          "it_style",
+          1952
+        ],
+        [
+          "it_text",
+          12711
+        ],
+        [
+          "it_create",
+          15095
+        ],
+        [
+          "it_insert",
+          15095
+        ],
+        [
+          "it_remove",
+          15220
+        ],
+        [
+          "it_other",
+          0
+        ],
+        [
+          "ui_drains",
+          25
+        ],
+        [
+          "ui_drain_ns",
+          125053252
+        ],
+        [
+          "ui_batches",
+          25
+        ],
+        [
+          "ui_tick_ns",
+          0
+        ],
+        [
+          "ui_anim_write_ns",
+          4330
+        ],
+        [
+          "ui_paint_ns",
+          0
+        ],
+        [
+          "ui_paints",
+          0
+        ],
+        [
+          "ui_notifies",
+          0
+        ]
+      ],
+      "spans_ms": [
+        {
+          "name": "lat.to_detail",
+          "n": 12,
+          "p50": 8.858177,
+          "p95": 9.953515,
+          "max": 10.113094,
+          "sum": 108.572791
+        },
+        {
+          "name": "lat.to_list",
+          "n": 12,
+          "p50": 23.170008,
+          "p95": 25.932913,
+          "max": 30.454214,
+          "sum": 286.73932
+        }
+      ],
+      "frame_link": {
+        "probe": true,
+        "verified_ms": {
+          "n": 24,
+          "p50": 22.239151,
+          "p95": 25.932913,
+          "p99": 30.454214,
+          "max": 30.454214
+        },
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 1,
+        "dropped_at_begin": 0,
+        "pending_at_end": 0
+      }
+    },
+    {
+      "name": "filter_50k",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.000161399,
+      "fps": 3.999935441441969,
+      "draw_ms": {
+        "n": 40,
+        "p50": 1.6925670000000002,
+        "p95": 2.7061339999999996,
+        "p99": 3.678098,
+        "max": 3.678098
+      },
+      "dirty_to_draw_ms": {
+        "n": 40,
+        "p50": 1.693422,
+        "p95": 2.7075609999999997,
+        "p99": 3.67936,
+        "max": 3.67936
+      },
+      "tick_to_frame_ms": {
+        "n": 39,
+        "p50": 9.43486,
+        "p95": 11.448831,
+        "p99": 12.10733,
+        "max": 12.10733
+      },
+      "late_frames": 0,
+      "cpu_pct": 4.223581831811593,
+      "footprint_mb": 0.0,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 40,
+      "compute_ms": [],
+      "threads_cpu_pct": [
+        [
+          "nsh-engine",
+          2.999951581081477
+        ],
+        [
+          "bench-nsh",
+          0.999983860360492
+        ],
+        [
+          "[vkps] Update",
+          0.19999677207209843
+        ]
+      ],
+      "counters": [
+        [
+          "eng_wakes",
+          2195
+        ],
+        [
+          "eng_busy_ns",
+          286249249
+        ],
+        [
+          "eng_tasks_ns",
+          57390410
+        ],
+        [
+          "eng_commit_ns",
+          229693111
+        ],
+        [
+          "eng_commit_js_ns",
+          147359
+        ],
+        [
+          "eng_apply_ops_ns",
+          38025
+        ],
+        [
+          "eng_ops",
+          0
+        ],
+        [
+          "eng_submits",
+          40
+        ],
+        [
+          "eng_items",
+          20438
+        ],
+        [
+          "core_rounds",
+          2507
+        ],
+        [
+          "core_layout_skipped",
+          0
+        ],
+        [
+          "core_render_ns",
+          6323445
+        ],
+        [
+          "core_flush_ns",
+          25193764
+        ],
+        [
+          "core_layout_ns",
+          179962781
+        ],
+        [
+          "core_layout_main",
+          40
+        ],
+        [
+          "core_emit_ns",
+          50483
+        ],
+        [
+          "core_lists_ns",
+          1707604
+        ],
+        [
+          "core_text_ns",
+          14783595
+        ],
+        [
+          "rx_computations",
+          14396
+        ],
+        [
+          "it_frame",
+          4294
+        ],
+        [
+          "it_style",
+          2
+        ],
+        [
+          "it_text",
+          13992
+        ],
+        [
+          "it_create",
+          527
+        ],
+        [
+          "it_insert",
+          527
+        ],
+        [
+          "it_remove",
+          1055
+        ],
+        [
+          "it_other",
+          41
+        ],
+        [
+          "ui_drains",
+          40
+        ],
+        [
+          "ui_drain_ns",
+          28711544
+        ],
+        [
+          "ui_batches",
+          40
+        ],
+        [
+          "ui_tick_ns",
+          0
+        ],
+        [
+          "ui_anim_write_ns",
+          7732
+        ],
+        [
+          "ui_paint_ns",
+          0
+        ],
+        [
+          "ui_paints",
+          0
+        ],
+        [
+          "ui_notifies",
+          0
+        ]
+      ],
+      "frame_link": {
+        "probe": true,
+        "verified_ms": {
+          "n": 39,
+          "p50": 9.43486,
+          "p95": 11.448831,
+          "p99": 12.10733,
+          "max": 12.10733
+        },
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 0,
+        "dropped_at_begin": 0,
+        "pending_at_end": 1
+      }
+    },
+    {
+      "name": "select_under_load",
+      "rate": 1000,
+      "scroll": false,
+      "secs": 10.000102878,
+      "fps": 112.7988395480985,
+      "draw_ms": {
+        "n": 1132,
+        "p50": 0.340727,
+        "p95": 0.653797,
+        "p99": 0.943603,
+        "max": 4.767456
+      },
+      "dirty_to_draw_ms": {
+        "n": 1132,
+        "p50": 0.341211,
+        "p95": 0.6546050000000001,
+        "p99": 0.944327,
+        "max": 4.768008
+      },
+      "tick_to_frame_ms": {
+        "n": 1048,
+        "p50": 0.6993779999999999,
+        "p95": 2.215149,
+        "p99": 9.57122,
+        "max": 19.571686
+      },
+      "late_frames": 0,
+      "cpu_pct": 9.278434545321083,
+      "footprint_mb": 0.0,
+      "emitted_batches": 1000,
+      "applied_batches": 1000,
+      "emitted_rows": 10000,
+      "triggers": 48,
+      "compute_ms": [],
+      "threads_cpu_pct": [
+        [
+          "bench-nsh",
+          5.199946503990356
+        ],
+        [
+          "nsh-engine",
+          4.099957820453935
+        ]
+      ],
+      "counters": [
+        [
+          "eng_wakes",
+          3389
+        ],
+        [
+          "eng_busy_ns",
+          389106527
+        ],
+        [
+          "eng_tasks_ns",
+          67223431
+        ],
+        [
+          "eng_commit_ns",
+          316766317
+        ],
+        [
+          "eng_commit_js_ns",
+          194996
+        ],
+        [
+          "eng_apply_ops_ns",
+          56620
+        ],
+        [
+          "eng_ops",
+          0
+        ],
+        [
+          "eng_submits",
+          1144
+        ],
+        [
+          "eng_items",
+          21842
+        ],
+        [
+          "core_rounds",
+          3405
+        ],
+        [
+          "core_layout_skipped",
+          0
+        ],
+        [
+          "core_render_ns",
+          18654941
+        ],
+        [
+          "core_flush_ns",
+          33267821
+        ],
+        [
+          "core_layout_ns",
+          234569389
+        ],
+        [
+          "core_layout_main",
+          1050
+        ],
+        [
+          "core_emit_ns",
+          3700630
+        ],
+        [
+          "core_lists_ns",
+          5288547
+        ],
+        [
+          "core_text_ns",
+          19648135
+        ],
+        [
+          "rx_computations",
+          41891
+        ],
+        [
+          "it_frame",
+          2392
+        ],
+        [
+          "it_style",
+          1696
+        ],
+        [
+          "it_text",
+          14864
+        ],
+        [
+          "it_create",
+          1180
+        ],
+        [
+          "it_insert",
+          1180
+        ],
+        [
+          "it_remove",
+          527
+        ],
+        [
+          "it_other",
+          3
+        ],
+        [
+          "ui_drains",
+          1143
+        ],
+        [
+          "ui_drain_ns",
+          38333907
+        ],
+        [
+          "ui_batches",
+          1144
+        ],
+        [
+          "ui_tick_ns",
+          0
+        ],
+        [
+          "ui_anim_write_ns",
+          69365
+        ],
+        [
+          "ui_paint_ns",
+          0
+        ],
+        [
+          "ui_paints",
+          0
+        ],
+        [
+          "ui_notifies",
+          0
+        ]
+      ],
+      "frame_link": {
+        "probe": true,
+        "verified_ms": {
+          "n": 1048,
+          "p50": 0.6993779999999999,
+          "p95": 2.215149,
+          "p99": 10.125362,
+          "max": 19.571686
+        },
+        "early": 1,
+        "early_gap_ms": {
+          "n": 1,
+          "p50": 2.886559,
+          "p95": 2.886559,
+          "p99": 2.886559,
+          "max": 2.886559
+        },
+        "stale_draws": 0,
+        "stale_presents": 0,
+        "dropped_at_begin": 1,
+        "pending_at_end": 0
+      }
+    },
+    {
+      "name": "cooldown",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.000107841,
+      "fps": 3.6665348657378476,
+      "draw_ms": {
+        "n": 7,
+        "p50": 0.708473,
+        "p95": 1.597907,
+        "p99": 1.597907,
+        "max": 1.597907
+      },
+      "dirty_to_draw_ms": {
+        "n": 7,
+        "p50": 0.7089540000000001,
+        "p95": 1.598501,
+        "p99": 1.598501,
+        "max": 1.598501
+      },
+      "tick_to_frame_ms": {
+        "n": 1,
+        "p50": 2.143988,
+        "p95": 2.143988,
+        "p99": 2.143988,
+        "max": 2.143988
+      },
+      "late_frames": 0,
+      "cpu_pct": 0.7346402585532796,
+      "footprint_mb": 0.0,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 1,
+      "compute_ms": [],
+      "threads_cpu_pct": [
+        [
+          "nsh-engine",
+          0.33332135143071373
+        ]
+      ],
+      "counters": [
+        [
+          "eng_wakes",
+          716
+        ],
+        [
+          "eng_busy_ns",
+          6948672
+        ],
+        [
+          "eng_tasks_ns",
+          1726099
+        ],
+        [
+          "eng_commit_ns",
+          5059131
+        ],
+        [
+          "eng_commit_js_ns",
+          38929
+        ],
+        [
+          "eng_apply_ops_ns",
+          11067
+        ],
+        [
+          "eng_ops",
+          0
+        ],
+        [
+          "eng_submits",
+          7
+        ],
+        [
+          "eng_items",
+          1239
+        ],
+        [
+          "core_rounds",
+          716
+        ],
+        [
+          "core_layout_skipped",
+          0
+        ],
+        [
+          "core_render_ns",
+          1117210
+        ],
+        [
+          "core_flush_ns",
+          209462
+        ],
+        [
+          "core_layout_ns",
+          2978161
+        ],
+        [
+          "core_layout_main",
+          2
+        ],
+        [
+          "core_emit_ns",
+          14387
+        ],
+        [
+          "core_lists_ns",
+          105314
+        ],
+        [
+          "core_text_ns",
+          406357
+        ],
+        [
+          "rx_computations",
+          1028
+        ],
+        [
+          "it_frame",
+          285
+        ],
+        [
+          "it_style",
+          85
+        ],
+        [
+          "it_text",
+          221
+        ],
+        [
+          "it_create",
+          264
+        ],
+        [
+          "it_insert",
+          264
+        ],
+        [
+          "it_remove",
+          120
+        ],
+        [
+          "it_other",
+          0
+        ],
+        [
+          "ui_drains",
+          7
+        ],
+        [
+          "ui_drain_ns",
+          1913144
+        ],
+        [
+          "ui_batches",
+          7
+        ],
+        [
+          "ui_tick_ns",
+          0
+        ],
+        [
+          "ui_anim_write_ns",
+          700
+        ],
+        [
+          "ui_paint_ns",
+          0
+        ],
+        [
+          "ui_paints",
+          0
+        ],
+        [
+          "ui_notifies",
+          0
+        ]
+      ],
+      "frame_link": {
+        "probe": true,
+        "verified_ms": {
+          "n": 1,
+          "p50": 2.143988,
+          "p95": 2.143988,
+          "p99": 2.143988,
+          "max": 2.143988
+        },
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 3,
+        "dropped_at_begin": 0,
+        "pending_at_end": 0
+      }
+    }
+  ]
+}

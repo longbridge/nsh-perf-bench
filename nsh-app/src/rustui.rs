@@ -12,7 +12,7 @@ use futures::StreamExt;
 use nsh_core::time::unix_ms;
 use nsh_core::ui::prelude::*;
 
-use crate::{DRIVER, RX};
+use crate::{DRIVER, RX, ms_since, span, trace, trace_taken};
 
 const ROW_H: f32 = 22.0;
 const FLASH: f64 = 600.0;
@@ -117,7 +117,12 @@ pub fn BenchRoot() -> impl IntoElement {
         let seq = seq.clone();
         spawn(async move {
             while let Some(b) = rx.next().await {
+                trace_taken(b.emit_ns);
+                let t = Instant::now();
                 apply(st, &seq, last_change, b);
+                if trace() {
+                    span("rs.apply", ms_since(t));
+                }
             }
         });
     }
@@ -170,7 +175,11 @@ pub fn BenchRoot() -> impl IntoElement {
             d.metrics.record_compute(task, t0.elapsed().as_secs_f64() * 1000.0);
             return;
         }
-        d.metrics.on_trigger();
+        if p.kind == "tab" {
+            d.metrics.on_trigger_labeled(Some(if st.tab.get_untracked() == 0 { "to_detail" } else { "to_list" }));
+        } else {
+            d.metrics.on_trigger();
+        }
         match p.kind.as_str() {
             "select" => st.selected.update(|s| *s = (*s + 1) % bench_core::SYMBOLS),
             "tab" => st.tab.update(|t| *t = 1 - *t),
@@ -194,11 +203,11 @@ pub fn BenchRoot() -> impl IntoElement {
         .child(
             view()
                 .flex_1()
-                .child(If::new(move || kind() == "anim_js", move || dynamic(move || AnimJs(param.get()))))
+                .child(If::new(move || kind().starts_with("anim_js"), move || dynamic(move || AnimJs(param.get(), AnimVariant::of(&kind())))))
                 .child(If::new(move || kind() == "anim_native", move || dynamic(move || AnimNative(param.get()))))
                 .child(If::new(move || kind() == "tab", move || tabs(st)))
                 .child(If::new(move || kind() == "filter", move || filter_view(st)))
-                .child(If::new(move || !["anim_js", "anim_native", "tab", "filter"].contains(&kind().as_str()), move || quotes(st))),
+                .child(If::new(move || !(kind().starts_with("anim_") || ["tab", "filter"].contains(&kind().as_str())), move || quotes(st))),
         )
         .child(
             view()
@@ -278,9 +287,62 @@ fn quote_row(st: State, i: impl Fn() -> usize + Copy + 'static) -> impl IntoElem
         .child(txt(with(|c| format!("{:.3} / {:.3}", c.row.bid, c.row.ask)), 130.0, true, FG))
 }
 
+/// 详情字段的求值方式（BENCH_DETAIL，A/B 用）：默认每个绑定各自重建全部 40 个字段；
+/// memo 整组派生一次再按下标取；field 每个绑定只算自己的字段
+#[derive(Clone, Copy, PartialEq)]
+enum DetailMode {
+    Orig,
+    Memo,
+    Field,
+}
+fn detail_mode() -> DetailMode {
+    match std::env::var("BENCH_DETAIL").as_deref() {
+        Ok("memo") => DetailMode::Memo,
+        Ok("field") => DetailMode::Field,
+        _ => DetailMode::Orig,
+    }
+}
+
+/// 详情第 k 个字段（DetailMode::Field）
+fn detail_field(r: &Row, k: usize) -> (String, String) {
+    let chg = r.last - r.prev;
+    let (name, value) = match k {
+        0 => ("代码", r.code.clone()),
+        1 => ("名称", r.name.clone()),
+        2 => ("最新价", format!("{:.3}", r.last)),
+        3 => ("昨收", format!("{:.3}", r.prev)),
+        4 => ("涨跌", signed(chg, 3)),
+        5 => ("涨跌幅", format!("{}%", signed(chg / r.prev * 100.0, 2))),
+        6 => ("最高", format!("{:.3}", r.high)),
+        7 => ("最低", format!("{:.3}", r.low)),
+        8 => ("买一", format!("{:.3}", r.bid)),
+        9 => ("卖一", format!("{:.3}", r.ask)),
+        10 => ("成交量", r.vol.to_string()),
+        11 => ("成交额", format!("{:.0}", r.turnover)),
+        k => return (format!("指标{:02}", k - 12), format!("{:.4}", r.last * (k - 11) as f64 / 7.0)),
+    };
+    (name.into(), value)
+}
+
+/// BENCH_TRACE：记一次求值的耗时与本线程分配次数 / 字节
+fn traced<T>(name: &str, f: impl FnOnce() -> T) -> T {
+    if !trace() {
+        return f();
+    }
+    let (c0, b0) = crate::alloc_count();
+    let t = Instant::now();
+    let r = f();
+    let ms = ms_since(t);
+    let (c1, b1) = crate::alloc_count();
+    span(name, ms);
+    span(&format!("{name}.allocs"), (c1 - c0) as f64);
+    span(&format!("{name}.kb"), (b1 - b0) as f64 / 1024.0);
+    r
+}
+
 /// 详情：选中行的 40 个字段
 fn detail(st: State, i: impl Fn() -> usize + Copy + 'static) -> impl IntoElement {
-    let fields = move || {
+    let fields = move || traced("detail.fields", || {
         let r = row_of(st, i()).with(|c| c.row.clone());
         let chg = r.last - r.prev;
         let mut kv: Vec<(String, String)> = vec![
@@ -301,8 +363,14 @@ fn detail(st: State, i: impl Fn() -> usize + Copy + 'static) -> impl IntoElement
             kv.push((format!("指标{k:02}"), format!("{:.4}", r.last * (k + 1) as f64 / 7.0)));
         }
         kv
+    });
+    let mode = detail_mode();
+    let memo = (mode == DetailMode::Memo).then(|| computed(fields));
+    let field = move |k: usize| match (mode, memo) {
+        (DetailMode::Memo, Some(m)) => m.with(|v| v[k].clone()),
+        (DetailMode::Field, _) => traced("detail.field", || row_of(st, i()).with(|c| detail_field(&c.row, k))),
+        _ => fields()[k].clone(),
     };
-    let field = move |k: usize| fields()[k].clone();
     view().flex_row().flex_wrap().p(px(8.0)).child(Each::new(
         || (0..40).collect::<Vec<usize>>(),
         |k: &usize| *k,
@@ -435,9 +503,26 @@ fn quotes(st: State) -> impl IntoElement {
         )
 }
 
+/// 逐帧动画的写法（animation_ab 对照）：Left 为标准场景；Tx 同轨迹改 translateX；Curve 改走原生动画的轨迹（translateX）
+#[derive(Clone, Copy, PartialEq)]
+enum AnimVariant {
+    Left,
+    Tx,
+    Curve,
+}
+impl AnimVariant {
+    fn of(kind: &str) -> AnimVariant {
+        match kind {
+            "anim_js_tx" => AnimVariant::Tx,
+            "anim_js_curve" => AnimVariant::Curve,
+            _ => AnimVariant::Left,
+        }
+    }
+}
+
 /// 逻辑层逐帧驱动：每帧写时间 signal，N 个方块的位置由它算出
 #[allow(non_snake_case)]
-fn AnimJs(n: usize) -> impl IntoElement {
+fn AnimJs(n: usize, variant: AnimVariant) -> impl IntoElement {
     let t = signal(0.0_f64);
     let t0 = Instant::now();
     let alive = Rc::new(std::cell::Cell::new(true));
@@ -446,7 +531,11 @@ fn AnimJs(n: usize) -> impl IntoElement {
     spawn(async move {
         while alive.get() {
             next_frame().await;
+            let a = Instant::now();
             t.set(t0.elapsed().as_secs_f64());
+            if trace() {
+                span("anim.set", ms_since(a));
+            }
         }
     });
     view().flex_1().overflow_hidden().child(Each::new(
@@ -455,15 +544,23 @@ fn AnimJs(n: usize) -> impl IntoElement {
         move |i, _| {
             let i = i.get_untracked();
             let ph = move || t.get() * std::f64::consts::PI + i as f64 * 0.1;
-            view()
-                .absolute()
-                .left(move || px(((ph().sin() * 0.5 + 0.5) * 1400.0) as f32))
-                .top(px((i % 40) as f32 * 22.0 + 4.0))
+            let curve = move || bench_core::native_curve(i, t.get() * 1000.0);
+            let x = move || match variant {
+                AnimVariant::Curve => curve().0 as f32,
+                _ => ((ph().sin() * 0.5 + 0.5) * 1400.0) as f32,
+            };
+            let opacity = move || match variant {
+                AnimVariant::Curve => curve().1 as f32,
+                _ => (0.3 + 0.7 * ph().cos().powi(2)) as f32,
+            };
+            let v = view().absolute();
+            let v = if variant == AnimVariant::Left { v.left(move || px(x())) } else { v.left_0().translate_x(x) };
+            v.top(px((i % 40) as f32 * 22.0 + 4.0))
                 .w(px(16.0))
                 .h(px(16.0))
                 .rounded(px(2.0))
                 .bg(if i % 2 == 0 { UP } else { DOWN })
-                .opacity(move || (0.3 + 0.7 * ph().cos().powi(2)) as f32)
+                .opacity(opacity)
         },
     ))
 }

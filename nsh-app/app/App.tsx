@@ -28,8 +28,18 @@ interface BenchApi {
   detail(idx: number): string;
   task(name: string): number;
   filter(term: string): string;
+  // BENCH_TRACE 诊断
+  trace(): boolean;
+  traceJs(id: number, parse: number, apply: number): void;
+  span(name: string, ms: number): void;
+  markTab(toDetail: boolean): void;
+  noop(): void;
+  noopStr(name: string): number;
+  taskTimed(name: string): number;
 }
 const { Bench } = nativeModule<{ Bench: BenchApi }>("host/bench");
+/** BENCH_TRACE=1：记录解析、写 signal 等分段耗时 */
+const TRACE = Bench.trace();
 
 const C = { bg: "#161419", line: "#2e2c33", fg: "#e7e6eb", muted: "#656466", up: "#20a16e", down: "#cc3333", upFlash: "rgba(32,161,110,0.45)", downFlash: "rgba(204,51,51,0.45)", upBg: "rgba(32,161,110,0.14)", downBg: "rgba(204,51,51,0.14)", sel: "rgba(55,160,255,0.14)" };
 const ROW_H = 22;
@@ -67,7 +77,9 @@ const htrades = signal<HTrade[]>([]);
 const hhits = signal<string[][]>([]);
 
 function applyView(json: string) {
+  const t0 = TRACE ? performance.now() : 0;
   const v = JSON.parse(json) as { id: number; rows: [number, string[], number, number][]; bids: HLevel[] | null; asks: HLevel[] | null; trades: HTrade[] | null };
+  const t1 = TRACE ? performance.now() : 0;
   const t = Date.now();
   batch(() => {
     for (const [i, s, c, f] of v.rows) hrows[i].set({ s, c, f, at: t });
@@ -77,11 +89,14 @@ function applyView(json: string) {
     batches.set(batches() + 1);
   });
   if (v.rows.length) lastChange = t;
+  if (TRACE) Bench.traceJs(v.id, t1 - t0, performance.now() - t1);
   Bench.appliedPost(v.id);
 }
 
 function apply(json: string) {
+  const t0 = TRACE ? performance.now() : 0;
   const b = JSON.parse(json) as Batch;
+  const t1 = TRACE ? performance.now() : 0;
   const t = Date.now();
   batch(() => {
     for (const r of b.rows) {
@@ -95,6 +110,7 @@ function apply(json: string) {
     batches.set(batches() + 1);
   });
   if (b.rows.length) lastChange = t;
+  if (TRACE) Bench.traceJs(b.seq, t1 - t0, performance.now() - t1);
   Bench.applied(b.seq);
 }
 
@@ -108,13 +124,75 @@ setInterval(() => {
 let calc: { items: W.Item[]; closes: number[]; json: string } | undefined;
 let last = 0;
 let k = 0;
-const EVERY: Record<string, number> = { select: 200, filter: 250, compute: 300, tab: 400, compute_load: 400 };
+const EVERY: Record<string, number> = { select: 200, filter: 250, compute: 300, tab: 400, compute_load: 400, compute_probe: 100 };
+let probe: W.ProbeData | undefined;
+const probeSeen = new Set<string>();
+/** compute_ab：一项细分测量；首次执行另记 `.first` */
+function probeSpan(name: string, f: () => unknown, check?: (r: unknown) => boolean) {
+  const t0 = performance.now();
+  const r = f();
+  const ms = performance.now() - t0;
+  Bench.span(probeSeen.has(name) ? name : `${name}.first`, ms);
+  probeSeen.add(name);
+  if (check && !check(r)) Bench.span(`${name}.invalid`, 1);
+}
+const PROBES_JS: (() => void)[] = [
+  () => probeSpan("js.call_noop_x1000", () => { for (let i = 0; i < 1000; i++) Bench.noop(); }),
+  () => probeSpan("js.call_str_x1000", () => { for (let i = 0; i < 1000; i++) Bench.noopStr("sort_100k"); }),
+  () => probeSpan("sort.full", () => W.taskSort(probe!.items)),
+  () => probeSpan("sort.slice", () => probe!.items.slice()),
+  () => {
+    const v = probe!.items.slice();
+    probeSpan("sort.cmp_only", () => v.sort((a, b) => b.chg_pct - a.chg_pct), (r) => W.sortedDesc((r as W.Item[]).map((x) => x.chg_pct)));
+  },
+  () => {
+    const v = probe!.chg.slice();
+    probeSpan("sort.f64_native", () => v.sort().reverse(), (r) => W.sortedDesc(r as Float64Array));
+  },
+  () => {
+    const v = Array.from(probe!.chg);
+    probeSpan("sort.num_cmp", () => v.sort((a, b) => b - a), (r) => W.sortedDesc(r as number[]));
+  },
+  () => {
+    let n = 0;
+    const v = probe!.items.slice();
+    v.sort((a, b) => (n++, b.chg_pct - a.chg_pct));
+    Bench.span("sort.cmp_calls", n);
+  },
+  () => probeSpan("agg.obj", () => W.taskAgg(probe!.items)),
+  () => probeSpan("agg.soa", () => W.aggSoa(probe!), (r) => Math.abs((r as number) - W.taskAgg(probe!.items)) < 1e-3 * Math.abs(r as number)),
+  () => probeSpan("ema.arr", () => W.taskEma(probe!.closes)),
+  () => probeSpan("ema.f64", () => W.emaF64(probe!.closesF64), (r) => r === W.taskEma(probe!.closes)),
+  () => probeSpan("json.obj", () => W.taskJson(probe!.json)),
+  () => probeSpan("json.arr", () => (JSON.parse(probe!.jsonArr) as unknown[]).length),
+];
+const PROBES_HY: (() => void)[] = [
+  () => probeSpan("js.call_noop_x1000", () => { for (let i = 0; i < 1000; i++) Bench.noop(); }),
+  () => probeSpan("js.call_str_x1000", () => { for (let i = 0; i < 1000; i++) Bench.noopStr("sort_100k"); }),
+  ...W.COMPUTE_TASKS.map((task) => () => {
+    const t0 = performance.now();
+    const inner = Bench.taskTimed(task);
+    const outer = performance.now() - t0;
+    Bench.span(`hy.${task}.outer`, outer);
+    Bench.span(`hy.${task}.inner`, inner);
+    Bench.span(`hy.${task}.bridge_us`, (outer - inner) * 1000);
+  }),
+];
 setInterval(() => {
   const p = info();
   const ms = EVERY[p.kind];
   if (!ms || performance.now() - last < ms) return;
   last = performance.now();
   k++;
+  if (p.kind === "compute_probe") {
+    if (!HY) {
+      calc ??= { items: W.items(100_000), closes: W.closes(100_000), json: Bench.bigJson() };
+      probe ??= W.probeData(calc.items, calc.closes, calc.json);
+    }
+    const list = HY ? PROBES_HY : PROBES_JS;
+    list[k % list.length]();
+    return;
+  }
   if (p.kind === "compute" || p.kind === "compute_load") {
     const task = p.kind === "compute_load" ? "agg_100k" : W.COMPUTE_TASKS[k % 4];
     if (HY) {
@@ -133,7 +211,8 @@ setInterval(() => {
     Bench.compute(task, performance.now() - t0);
     return;
   }
-  Bench.mark();
+  if (p.kind === "tab") Bench.markTab(tab() === 0);
+  else Bench.mark();
   if (p.kind === "select") selected.set((selected() + 1) % rows.length);
   else if (p.kind === "tab") tab.set(1 - tab());
   else {
@@ -195,20 +274,13 @@ function QuoteRow(props: { i: number }) {
 /** 详情面板：选中行的 40 个字段（同 Rust 版） */
 function Detail(props: { i: number }) {
   const fields = (): [string, string][] => {
-    if (HY) {
-      hrows[props.i]();
-      return JSON.parse(Bench.detail(props.i));
+    if (TRACE) {
+      const a = performance.now();
+      const r = detailFields(props.i);
+      Bench.span("detail.fields", performance.now() - a);
+      return r;
     }
-    const r = rows[props.i]().row;
-    const chg = r.last - r.prev;
-    const kv: [string, string][] = [
-      ["代码", r.code], ["名称", r.name], ["最新价", r.last.toFixed(3)], ["昨收", r.prev.toFixed(3)],
-      ["涨跌", (chg > 0 ? "+" : "") + chg.toFixed(3)], ["涨跌幅", (chg > 0 ? "+" : "") + ((chg / r.prev) * 100).toFixed(2) + "%"],
-      ["最高", r.high.toFixed(3)], ["最低", r.low.toFixed(3)], ["买一", r.bid.toFixed(3)], ["卖一", r.ask.toFixed(3)],
-      ["成交量", String(r.vol)], ["成交额", r.turnover.toFixed(0)],
-    ];
-    for (let k = 0; k < 28; k++) kv.push([`指标${String(k).padStart(2, "0")}`, ((r.last * (k + 1)) / 7).toFixed(4)]);
-    return kv;
+    return detailFields(props.i);
   };
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", padding: 8 }}>
@@ -222,6 +294,24 @@ function Detail(props: { i: number }) {
       </Each>
     </View>
   );
+}
+
+/** 详情的 40 个字段（TSX 现算；hybrid 由 Rust 生成） */
+function detailFields(i: number): [string, string][] {
+  if (HY) {
+    hrows[i]();
+    return JSON.parse(Bench.detail(i));
+  }
+  const r = rows[i]().row;
+  const chg = r.last - r.prev;
+  const kv: [string, string][] = [
+    ["代码", r.code], ["名称", r.name], ["最新价", r.last.toFixed(3)], ["昨收", r.prev.toFixed(3)],
+    ["涨跌", (chg > 0 ? "+" : "") + chg.toFixed(3)], ["涨跌幅", (chg > 0 ? "+" : "") + ((chg / r.prev) * 100).toFixed(2) + "%"],
+    ["最高", r.high.toFixed(3)], ["最低", r.low.toFixed(3)], ["买一", r.bid.toFixed(3)], ["卖一", r.ask.toFixed(3)],
+    ["成交量", String(r.vol)], ["成交额", r.turnover.toFixed(0)],
+  ];
+  for (let k = 0; k < 28; k++) kv.push([`指标${String(k).padStart(2, "0")}`, ((r.last * (k + 1)) / 7).toFixed(4)]);
+  return kv;
 }
 
 function Depth() {
@@ -308,15 +398,31 @@ function Quotes() {
   );
 }
 
-/** JS 逐帧驱动：rAF 写一个时间 signal，N 个方块的样式各自由它算出 */
-function AnimJs(props: { n: number }) {
+/** 原生动画的轨迹（animation_ab 对照，同 bench_core::native_curve）：返回 [位移, 透明度] */
+function nativeCurve(i: number, tMs: number): [number, number] {
+  const d = (i * 32) % 1000;
+  const u = tMs % (d + 2000);
+  let v = 0;
+  if (u >= d) {
+    const w = u - d;
+    const x = w < 1000 ? w / 1000 : 2 - w / 1000;
+    v = (1 - Math.cos(Math.PI * x)) / 2;
+  }
+  return [v * 1400, v < 0.5 ? 1 - 1.4 * v : 0.3 + 1.4 * (v - 0.5)];
+}
+
+/** JS 逐帧驱动：rAF 写一个时间 signal，N 个方块的样式各自由它算出。
+ *  variant（animation_ab 对照）：anim_js 改 left；anim_js_tx 同轨迹改 translateX；anim_js_curve 走原生动画的轨迹（translateX） */
+function AnimJs(props: { n: number; variant: string }) {
   const t = signal(0);
   const t0 = performance.now();
   let alive = true;
   cleanup(() => (alive = false));
   const frame = () => {
     if (!alive) return;
+    const a = TRACE ? performance.now() : 0;
     t.set((performance.now() - t0) / 1000);
+    if (TRACE) Bench.span("anim.set", performance.now() - a);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
@@ -327,6 +433,26 @@ function AnimJs(props: { n: number }) {
       <Each of={boxes()}>
         {(i) => {
           const ph = () => t() * Math.PI + i() * 0.1;
+          if (props.variant === "anim_js_tx" || props.variant === "anim_js_curve") {
+            const curve = props.variant === "anim_js_curve";
+            const x = () => (curve ? nativeCurve(i(), t() * 1000)[0] : (Math.sin(ph()) * 0.5 + 0.5) * 1400);
+            const o = () => (curve ? nativeCurve(i(), t() * 1000)[1] : 0.3 + 0.7 * Math.cos(ph()) ** 2);
+            return (
+              <View
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: (i() % 40) * 22 + 4,
+                  width: 16,
+                  height: 16,
+                  borderRadius: 2,
+                  backgroundColor: i() % 2 === 0 ? C.up : C.down,
+                  transform: [{ translateX: x() }],
+                  opacity: o(),
+                }}
+              />
+            );
+          }
           return (
             <View
               style={{
@@ -539,11 +665,11 @@ function App() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ flex: 1 }}>
-        <If when={kind() === "anim_js"}>{() => <AnimJs n={info().param} />}</If>
+        <If when={kind().startsWith("anim_js")}>{() => <AnimJs n={info().param} variant={kind()} />}</If>
         <If when={kind() === "anim_native"}>{() => <AnimNative n={info().param} />}</If>
         <If when={kind() === "tab"}><Tabs /></If>
         <If when={kind() === "filter"}><Filter /></If>
-        <If when={!["anim_js", "anim_native", "tab", "filter"].includes(kind())}><Quotes /></If>
+        <If when={!(kind().startsWith("anim_") || ["tab", "filter"].includes(kind()))}><Quotes /></If>
       </View>
       <View style={{ height: 22, flexDirection: "row", alignItems: "center", paddingHorizontal: 8, gap: 16, borderTopWidth: 1, borderColor: C.line }}>
         <Text style={{ fontSize: 12, color: C.muted }}>{`NSH TSX · ${info().scenario} · 阶段 ${info().name}`}</Text>

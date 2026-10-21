@@ -10,6 +10,8 @@ fi
 git -C vendor/nsh fetch -q origin
 git -C vendor/nsh checkout -q -f "$NSH_REV"
 git -C vendor/nsh apply "$PWD/patches/nsh-001-reset-runaway-count.patch"
+# 诊断计数器、提交版本探针与 A/B 开关（宿主代码依赖其中的 nsh_core::diag；开关默认关闭，行为同上）
+git -C vendor/nsh apply "$PWD/patches/nsh-002-perf-diagnostics.patch"
 # NSH 仓库的 rust-toolchain.toml 会触发 rustup 升级并装移动端 target，这里固定用本机 stable
 export RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN:-stable}
 cargo build --release --manifest-path vendor/nsh/Cargo.toml -p nsh-cli

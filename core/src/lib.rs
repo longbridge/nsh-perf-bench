@@ -192,6 +192,15 @@ pub fn scenario() -> String {
 }
 
 pub fn schedule() -> Vec<Phase> {
+    let v = full_schedule();
+    // BENCH_PHASES=r20000,anim_js_1000：诊断时只跑列出的阶段（保留 warmup / cooldown）
+    match std::env::var("BENCH_PHASES") {
+        Ok(only) => v.into_iter().filter(|p| matches!(p.name, "warmup" | "cooldown") || only.split(',').any(|n| n == p.name)).collect(),
+        Err(_) => v,
+    }
+}
+
+fn full_schedule() -> Vec<Phase> {
     // BENCH_SOAK=分钟：浸泡测试，每秒 1000 条持续 N 分钟，每 5 分钟一个阶段，看内存是否持续增长
     if let Some(min) = std::env::var("BENCH_SOAK").ok().and_then(|v| v.parse::<u64>().ok()) {
         const NAMES: [&str; 24] = ["soak05", "soak10", "soak15", "soak20", "soak25", "soak30", "soak35", "soak40", "soak45", "soak50", "soak55", "soak60",
@@ -212,6 +221,25 @@ pub fn schedule() -> Vec<Phase> {
                 ph("anim_js_1000", s(10), 0, false, "anim_js", 1000),
                 ph("anim_native_200", s(10), 0, false, "anim_native", 200),
                 ph("anim_native_1000", s(10), 0, false, "anim_native", 1000),
+                ph("cooldown", s(3), 0, false, "idle", 0),
+            ];
+        }
+        // 动画单因素对照（诊断用，不进标准报告）：逐帧 left → 逐帧 transform → 逐帧走原生动画的轨迹 → 原生动画
+        "animation_ab" => {
+            return vec![
+                ph("warmup", s(3), 0, false, "idle", 0),
+                ph("anim_js_1000", s(10), 0, false, "anim_js", 1000),
+                ph("anim_js_tx_1000", s(10), 0, false, "anim_js_tx", 1000),
+                ph("anim_js_curve_1000", s(10), 0, false, "anim_js_curve", 1000),
+                ph("anim_native_1000", s(10), 0, false, "anim_native", 1000),
+                ph("cooldown", s(3), 0, false, "idle", 0),
+            ];
+        }
+        // 计算拆分探针（诊断用）：每 100ms 轮流执行一项细分测量
+        "compute_ab" => {
+            return vec![
+                ph("warmup", s(3), 0, false, "idle", 0),
+                ph("compute_probe", s(40), 0, false, "compute_probe", 100_000),
                 ph("cooldown", s(3), 0, false, "idle", 0),
             ];
         }
@@ -325,6 +353,17 @@ struct PhaseAcc {
     late_frames: u64,
     compute: HashMap<String, Vec<f64>>,
     triggers: u64,
+    threads_start: HashMap<u32, (String, f64)>,
+    counters_start: Vec<(&'static str, u64)>,
+    spans: HashMap<String, Vec<f64>>,
+    /// 经提交版本确认的延迟，及其比 applied 关联晚了多少
+    verified: Vec<f64>,
+    early: Vec<f64>,
+    /// 时间戳早于本阶段开始、却在本阶段才收集到的帧
+    stale_draws: u64,
+    stale_presents: u64,
+    /// 阶段开始时被清掉的未上屏更新
+    dropped_at_begin: u64,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -372,6 +411,47 @@ pub struct PhaseReport {
     pub triggers: u64,
     /// 计算任务耗时（计算场景）：任务名 → 分位数
     pub compute_ms: Vec<(String, Pct)>,
+    /// 按线程名汇总的 CPU（%，单核 = 100），仅 Linux；同名线程合并
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub threads_cpu_pct: Vec<(String, f64)>,
+    /// 诊断计数器在本阶段的增量（宿主通过 `Metrics::set_counters` 提供）
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub counters: Vec<(String, u64)>,
+    /// 分段计时（ms）：名称 → 分位数与总和
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub spans_ms: Vec<SpanReport>,
+    /// 帧关联诊断
+    pub frame_link: FrameLink,
+}
+
+#[derive(Serialize, Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct SpanReport {
+    pub name: String,
+    pub n: usize,
+    pub p50: f64,
+    pub p95: f64,
+    pub max: f64,
+    pub sum: f64,
+}
+
+/// 更新与帧的关联诊断：applied 关联（现有 tick_to_frame_ms）与提交版本确认的对比
+#[derive(Serialize, Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct FrameLink {
+    /// 是否有提交探针（NSH 宿主有；GPUI 在同一线程应用并绘制，applied 关联即因果）
+    pub probe: bool,
+    /// 经确认：UI 线程应用了包含该更新的批次之后开始的第一帧
+    pub verified_ms: Option<Pct>,
+    /// applied 关联早于确认帧的更新数（被计到了尚未包含它的帧上）
+    pub early: u64,
+    /// 早关联时少算的延迟（ms）
+    pub early_gap_ms: Option<Pct>,
+    pub stale_draws: u64,
+    pub stale_presents: u64,
+    pub dropped_at_begin: u64,
+    /// 阶段结束时仍未上屏的更新
+    pub pending_at_end: u64,
 }
 
 #[derive(Serialize, Debug)]
@@ -387,12 +467,65 @@ pub struct Metrics {
     name: String,
     pub first_present_ns: AtomicU64,
     emits: Mutex<HashMap<u64, Instant>>,
-    /// (applied_at, emit_at)：已应用、尚未出现在帧里的批次
-    applied: Mutex<VecDeque<(Instant, Instant)>>,
+    /// 已应用、尚未出现在帧里的批次
+    applied: Mutex<VecDeque<Pending>>,
+    counters: OnceLock<fn() -> Vec<(&'static str, u64)>>,
+    probe: OnceLock<CommitProbe>,
     acc: Mutex<PhaseAcc>,
     done: Mutex<Vec<PhaseReport>>,
     peak_fp: AtomicU64,
     late_budget_us: AtomicU32,
+}
+
+/// 每个线程的（线程名, CPU 秒），读 /proc/self/task/*/stat；非 Linux 返回空
+pub fn thread_cpu_seconds() -> HashMap<u32, (String, f64)> {
+    let mut out = HashMap::new();
+    #[cfg(target_os = "linux")]
+    {
+        let hz = unsafe { libc::sysconf(libc::_SC_CLK_TCK) } as f64;
+        if let Ok(dir) = std::fs::read_dir("/proc/self/task") {
+            for e in dir.flatten() {
+                let Ok(tid) = e.file_name().to_string_lossy().parse::<u32>() else { continue };
+                let Ok(stat) = std::fs::read_to_string(e.path().join("stat")) else { continue };
+                // comm 可能含空格，取最后一个 ')' 之后的字段
+                let (Some(l), Some(r)) = (stat.find('('), stat.rfind(')')) else { continue };
+                let name = stat[l + 1..r].to_string();
+                let f: Vec<&str> = stat[r + 2..].split_whitespace().collect();
+                // 去掉 pid 与 comm 后，utime / stime 是第 12 / 13 个字段
+                let (Some(u), Some(st)) = (f.get(11).and_then(|x| x.parse::<f64>().ok()), f.get(12).and_then(|x| x.parse::<f64>().ok())) else { continue };
+                out.insert(tid, (name, (u + st) / hz));
+            }
+        }
+    }
+    out
+}
+
+struct Pending {
+    applied_at: Instant,
+    emit: Instant,
+    /// 包含该更新的提交序号（UI 线程按序应用）
+    target: Option<u64>,
+    label: Option<&'static str>,
+    naive: Option<f64>,
+}
+
+/// 跨线程提交的宿主提供：已提交批次数、第 n 批在 UI 线程应用的时刻
+#[derive(Clone, Copy)]
+pub struct CommitProbe {
+    pub submitted: fn() -> u64,
+    pub ui_applied_at: fn(u64) -> Option<Instant>,
+}
+
+/// 本线程累计的次缺页数（minor page faults）；非 Linux 返回 0
+pub fn thread_minflt() -> u64 {
+    #[cfg(target_os = "linux")]
+    unsafe {
+        let mut ru: libc::rusage = std::mem::zeroed();
+        libc::getrusage(libc::RUSAGE_THREAD, &mut ru);
+        return ru.ru_minflt as u64;
+    }
+    #[allow(unreachable_code)]
+    0
 }
 
 pub fn cpu_seconds() -> f64 {
@@ -428,6 +561,8 @@ impl Metrics {
             first_present_ns: AtomicU64::new(0),
             emits: Mutex::new(HashMap::new()),
             applied: Mutex::new(VecDeque::new()),
+            counters: OnceLock::new(),
+            probe: OnceLock::new(),
             acc: Mutex::new(PhaseAcc::default()),
             done: Mutex::new(Vec::new()),
             peak_fp: AtomicU64::new(0),
@@ -437,8 +572,19 @@ impl Metrics {
 
     fn begin_phase(&self, p: Phase) {
         let mut a = self.acc.lock().unwrap();
-        *a = PhaseAcc { phase: Some(p), started: Some(Instant::now()), cpu_start: cpu_seconds(), ..Default::default() };
-        self.applied.lock().unwrap().clear();
+        let counters_start = self.counters.get().map(|f| f()).unwrap_or_default();
+        let mut q = self.applied.lock().unwrap();
+        let dropped_at_begin = q.len() as u64;
+        q.clear();
+        *a = PhaseAcc {
+            phase: Some(p),
+            started: Some(Instant::now()),
+            cpu_start: cpu_seconds(),
+            threads_start: thread_cpu_seconds(),
+            counters_start,
+            dropped_at_begin,
+            ..Default::default()
+        };
     }
 
     fn end_phase(&self) {
@@ -447,6 +593,40 @@ impl Metrics {
         let secs = a.started.map(|s| s.elapsed().as_secs_f64()).unwrap_or(1.0);
         let fp = footprint_mb();
         self.peak_fp.fetch_max((fp * 1000.0) as u64, Ordering::Relaxed);
+        let counters: Vec<(String, u64)> = match self.counters.get() {
+            Some(f) => f()
+                .into_iter()
+                .map(|(n, v)| (n.to_string(), v - a.counters_start.iter().find(|x| x.0 == n).map_or(0, |x| x.1)))
+                .collect(),
+            None => Vec::new(),
+        };
+        let mut spans_ms: Vec<SpanReport> = a
+            .spans
+            .iter_mut()
+            .map(|(k, v)| {
+                let sum = v.iter().sum();
+                let p = pct(v);
+                SpanReport { name: k.clone(), n: p.n, p50: p.p50, p95: p.p95, max: p.max, sum }
+            })
+            .collect();
+        spans_ms.sort_by(|x, y| x.name.cmp(&y.name));
+        let frame_link = FrameLink {
+            probe: self.probe.get().is_some(),
+            verified_ms: (!a.verified.is_empty()).then(|| pct(&mut a.verified)),
+            early: a.early.len() as u64,
+            early_gap_ms: (!a.early.is_empty()).then(|| pct(&mut a.early)),
+            stale_draws: a.stale_draws,
+            stale_presents: a.stale_presents,
+            dropped_at_begin: a.dropped_at_begin,
+            pending_at_end: self.applied.lock().unwrap().len() as u64,
+        };
+        let mut threads: HashMap<String, f64> = HashMap::new();
+        for (tid, (name, cpu)) in thread_cpu_seconds() {
+            let start = a.threads_start.get(&tid).map_or(0.0, |x| x.1);
+            *threads.entry(name).or_default() += (cpu - start) / secs * 100.0;
+        }
+        let mut threads_cpu_pct: Vec<(String, f64)> = threads.into_iter().filter(|x| x.1 >= 0.05).collect();
+        threads_cpu_pct.sort_by(|x, y| y.1.partial_cmp(&x.1).unwrap());
         let r = PhaseReport {
             name: p.name.to_string(),
             rate: p.rate,
@@ -468,6 +648,10 @@ impl Metrics {
                 v.sort_by(|x, y| x.0.cmp(&y.0));
                 v
             },
+            threads_cpu_pct,
+            counters,
+            spans_ms,
+            frame_link,
         };
         for (k, p) in &r.compute_ms {
             eprintln!("[bench]   compute {k:>16} n {:>4} p50 {:>8.2} ms p95 {:>8.2} ms", p.n, p.p50, p.p95);
@@ -477,6 +661,10 @@ impl Metrics {
             r.name, r.fps, r.draw_ms.p50, r.draw_ms.p99, r.tick_to_frame_ms.p50, r.tick_to_frame_ms.p99,
             r.late_frames, r.cpu_pct, r.footprint_mb, r.applied_batches, r.emitted_batches
         );
+        if !r.threads_cpu_pct.is_empty() {
+            let t: Vec<String> = r.threads_cpu_pct.iter().map(|(n, c)| format!("{n} {c:.1}%")).collect();
+            eprintln!("[bench]   threads {}", t.join(" | "));
+        }
         self.done.lock().unwrap().push(r);
     }
 
@@ -491,16 +679,48 @@ impl Metrics {
     pub fn on_applied(&self, seq: u64) {
         let emit = self.emits.lock().unwrap().remove(&seq);
         if let Some(emit) = emit {
-            self.applied.lock().unwrap().push_back((Instant::now(), emit));
+            self.push_pending(Instant::now(), emit, None);
             self.acc.lock().unwrap().applied_batches += 1;
         }
     }
 
     /// 交互场景：动作已触发（状态已改），之后第一帧算作它的响应
     pub fn on_trigger(&self) {
+        self.on_trigger_labeled(None);
+    }
+
+    /// 同 on_trigger；label 另记一份 `lat.<label>` 分段延迟（如切入列表 / 切入详情）
+    pub fn on_trigger_labeled(&self, label: Option<&'static str>) {
         let now = Instant::now();
-        self.applied.lock().unwrap().push_back((now, now));
+        self.push_pending(now, now, label);
         self.acc.lock().unwrap().triggers += 1;
+    }
+
+    fn push_pending(&self, applied_at: Instant, emit: Instant, label: Option<&'static str>) {
+        // 引擎线程上本轮的改动随下一次提交送往 UI 线程
+        let target = self.probe.get().map(|p| (p.submitted)() + 1);
+        self.applied.lock().unwrap().push_back(Pending { applied_at, emit, target, label, naive: None });
+    }
+
+    /// 诊断计数器：阶段开始 / 结束时各读一次，报告增量
+    pub fn set_counters(&self, f: fn() -> Vec<(&'static str, u64)>) {
+        let _ = self.counters.set(f);
+    }
+
+    /// 跨线程提交的宿主设置后，额外按提交版本确认每个更新所在的帧
+    pub fn set_commit_probe(&self, probe: CommitProbe) {
+        let _ = self.probe.set(probe);
+    }
+
+    /// 分段计时（ms），按名称汇总
+    pub fn record_span(&self, name: &str, ms: f64) {
+        let mut a = self.acc.lock().unwrap();
+        match a.spans.get_mut(name) {
+            Some(v) => v.push(ms),
+            None => {
+                a.spans.insert(name.to_string(), vec![ms]);
+            }
+        }
     }
 
     /// 计算场景：一次计算任务的耗时
@@ -516,6 +736,9 @@ impl Metrics {
     /// （刷新信号与首次失效中较晚者，等待刷新信号的时间不算帧的工作量）
     pub fn on_draw(&self, draw_start: Instant, draw_end: Instant, work_start: Option<Instant>) {
         let mut a = self.acc.lock().unwrap();
+        if a.started.is_some_and(|s| draw_start < s) {
+            a.stale_draws += 1;
+        }
         a.draws.push((draw_end - draw_start).as_secs_f64() * 1000.0);
         if let Some(d) = work_start {
             let w = draw_end.saturating_duration_since(d);
@@ -524,14 +747,38 @@ impl Metrics {
                 a.late_frames += 1;
             }
         }
-        // 绘制开始前已应用的批次，都包含在这一帧里
+        // applied 关联（现有口径）：绘制开始前已应用的批次，都算包含在这一帧里
         let mut q = self.applied.lock().unwrap();
-        while let Some(&(applied_at, emit)) = q.front() {
-            if applied_at > draw_start {
+        for it in q.iter_mut() {
+            if it.applied_at > draw_start {
                 break;
             }
+            if it.naive.is_none() {
+                let ms = draw_end.saturating_duration_since(it.emit).as_secs_f64() * 1000.0;
+                it.naive = Some(ms);
+                a.latency.push(ms);
+            }
+        }
+        // 提交版本确认：UI 线程在这一帧开始前应用了包含它的批次
+        let probe = self.probe.get();
+        while let Some(it) = q.front() {
+            let Some(naive) = it.naive else { break };
+            let ok = match (probe, it.target) {
+                (Some(p), Some(n)) => (p.ui_applied_at)(n).is_some_and(|t| t <= draw_start),
+                _ => true,
+            };
+            if !ok {
+                break;
+            }
+            let ms = draw_end.saturating_duration_since(it.emit).as_secs_f64() * 1000.0;
+            if let Some(l) = it.label {
+                a.spans.entry(format!("lat.{l}")).or_default().push(ms);
+            }
+            a.verified.push(ms);
+            if ms > naive + 1e-3 {
+                a.early.push(ms - naive);
+            }
             q.pop_front();
-            a.latency.push(draw_end.saturating_duration_since(emit).as_secs_f64() * 1000.0);
         }
     }
 
@@ -540,7 +787,11 @@ impl Metrics {
             self.first_present_ns
                 .store(present_end.saturating_duration_since(origin()).as_nanos().max(1) as u64, Ordering::Relaxed);
         }
-        self.acc.lock().unwrap().presents.push(present_end);
+        let mut a = self.acc.lock().unwrap();
+        if a.started.is_some_and(|s| present_end < s) {
+            a.stale_presents += 1;
+        }
+        a.presents.push(present_end);
     }
 
     fn write_report(&self) -> String {
@@ -666,5 +917,116 @@ pub fn filter(items: &[Item], term: &str) -> (Vec<usize>, usize) {
     (hits, total)
 }
 
+/// 原生动画的轨迹（逐帧版对照用）：循环 [延迟 (i*32)%1000ms → 1000ms 缓入缓出到 1 → 1000ms 回到 0]，
+/// 返回 (位移 px, 透明度)，与 `Animated.loop(sequence([delay, timing(1), timing(0)]))` + interpolate 相同
+pub fn native_curve(i: usize, t_ms: f64) -> (f64, f64) {
+    let d = ((i * 32) % 1000) as f64;
+    let u = t_ms % (d + 2000.0);
+    let v = if u < d {
+        0.0
+    } else {
+        let w = u - d;
+        let x = if w < 1000.0 { w / 1000.0 } else { 2.0 - w / 1000.0 };
+        (1.0 - (std::f64::consts::PI * x).cos()) / 2.0
+    };
+    let opacity = if v < 0.5 { 1.0 - 1.4 * v } else { 0.3 + 1.4 * (v - 0.5) };
+    (v * 1400.0, opacity)
+}
+
 pub const FILTER_TERMS: [&str; 8] = ["1", "12", "123", "2", "23", "234", "标的9", "999"];
 pub const COMPUTE_TASKS: [&str; 4] = ["sort_100k", "agg_100k", "ema_100k", "json_5mb"];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex as M;
+
+    /// 测试用的提交探针：已提交批次数、第 n 批在 UI 线程应用的时刻
+    static SUBMITTED: AtomicU64 = AtomicU64::new(0);
+    static UI_APPLIED: M<Vec<(u64, Instant)>> = M::new(Vec::new());
+    fn submitted() -> u64 {
+        SUBMITTED.load(Ordering::SeqCst)
+    }
+    fn ui_applied_at(n: u64) -> Option<Instant> {
+        UI_APPLIED.lock().unwrap().iter().find(|x| x.0 == n).map(|x| x.1)
+    }
+    const MS: Duration = Duration::from_millis(1);
+
+    fn metrics(probe: bool) -> Metrics {
+        let m = Metrics::new("test");
+        if probe {
+            m.set_commit_probe(CommitProbe { submitted, ui_applied_at });
+        }
+        m.begin_phase(ph("p", 1, 0, false, "select", 0));
+        m
+    }
+
+    fn link(m: &Metrics) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        let a = m.acc.lock().unwrap();
+        (a.latency.clone(), a.verified.clone(), a.early.clone())
+    }
+
+    /// 引擎线程已写状态（applied），但 UI 线程在下一帧开始之后才应用该提交：
+    /// applied 关联把更新算进了一帧不含它的帧，提交探针算到下一帧。
+    #[test]
+    fn applied_link_counts_a_frame_without_the_commit() {
+        let m = metrics(true);
+        let t0 = Instant::now();
+        SUBMITTED.store(7, Ordering::SeqCst);
+        m.on_trigger(); // 本轮改动随第 8 批提交
+        let applied = m.applied.lock().unwrap().front().unwrap().applied_at;
+        // 帧 A：applied 之后开始，但第 8 批尚未在 UI 线程应用
+        let a_start = applied + MS;
+        m.on_draw(a_start, a_start + MS, None);
+        let (naive, verified, _) = link(&m);
+        assert_eq!(naive.len(), 1, "applied 关联把帧 A 算作响应");
+        assert!(verified.is_empty(), "提交尚未应用，帧 A 不含该更新");
+        // UI 线程应用第 8 批，之后的帧 B 才包含它
+        UI_APPLIED.lock().unwrap().push((8, a_start + 2 * MS));
+        let b_start = a_start + 7 * MS;
+        m.on_draw(b_start, b_start + MS, None);
+        let (naive, verified, early) = link(&m);
+        assert_eq!(naive.len(), 1);
+        assert_eq!(verified.len(), 1);
+        assert_eq!(early.len(), 1, "applied 关联早了一帧");
+        assert!((verified[0] - naive[0] - 7.0).abs() < 0.5, "少算约 7ms：{naive:?} {verified:?}");
+        let _ = t0;
+    }
+
+    /// 同线程应用并绘制（GPUI）：没有探针时两种口径一致
+    #[test]
+    fn without_probe_verified_equals_applied_link() {
+        let m = metrics(false);
+        m.on_trigger();
+        let at = m.applied.lock().unwrap().front().unwrap().applied_at;
+        m.on_draw(at + MS, at + 2 * MS, None);
+        let (naive, verified, early) = link(&m);
+        assert_eq!(naive, verified);
+        assert!(early.is_empty());
+    }
+
+    /// 50ms 收集一次 profiler 事件：上一阶段末尾的帧在下一阶段开始后才收到，会计入下一阶段
+    #[test]
+    fn frames_collected_after_phase_switch_count_in_the_new_phase() {
+        let m = metrics(false);
+        let before = Instant::now();
+        std::thread::sleep(2 * MS);
+        m.begin_phase(ph("next", 1, 0, false, "idle", 0));
+        m.on_draw(before, before + MS, None);
+        m.on_present(before + MS);
+        let a = m.acc.lock().unwrap();
+        assert_eq!((a.stale_draws, a.stale_presents), (1, 1));
+        assert_eq!(a.presents.len(), 1, "现有 fps 把它算进了新阶段");
+    }
+
+    /// 阶段开始时清空未上屏的更新：这些更新既不进延迟，也不算丢失
+    #[test]
+    fn pending_updates_are_dropped_at_phase_start() {
+        let m = metrics(false);
+        m.on_trigger();
+        m.on_trigger();
+        m.begin_phase(ph("next", 1, 0, false, "idle", 0));
+        assert_eq!(m.acc.lock().unwrap().dropped_at_begin, 2);
+        assert!(m.applied.lock().unwrap().is_empty());
+    }
+}
