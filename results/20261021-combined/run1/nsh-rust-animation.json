@@ -1,0 +1,224 @@
+{
+  "implementation": "nsh-rust",
+  "scenario": "animation",
+  "startup_first_frame_ms": 297.187416,
+  "peak_footprint_mb": 207.563,
+  "phases": [
+    {
+      "name": "warmup",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.001276083,
+      "fps": 0.33319160661835057,
+      "draw_ms": {
+        "n": 1,
+        "p50": 1.514375,
+        "p95": 1.514375,
+        "p99": 1.514375,
+        "max": 1.514375
+      },
+      "dirty_to_draw_ms": {
+        "n": 1,
+        "p50": 1.546333,
+        "p95": 1.546333,
+        "p99": 1.546333,
+        "max": 1.546333
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 1.53261475212309,
+      "footprint_mb": 100.75086975097656,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "anim_js_200",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.002910709,
+      "fps": 118.86540174053653,
+      "draw_ms": {
+        "n": 1189,
+        "p50": 0.340125,
+        "p95": 0.58925,
+        "p99": 0.6310410000000001,
+        "max": 1.0772080000000002
+      },
+      "dirty_to_draw_ms": {
+        "n": 1189,
+        "p50": 0.371875,
+        "p95": 0.635792,
+        "p99": 0.681958,
+        "max": 1.1071250000000001
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 25.709866605988108,
+      "footprint_mb": 191.07901763916016,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "anim_js_1000",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.000876208,
+      "fps": 119.3895389930818,
+      "draw_ms": {
+        "n": 1194,
+        "p50": 0.5359590000000001,
+        "p95": 0.983791,
+        "p99": 1.0410840000000001,
+        "max": 1.210334
+      },
+      "dirty_to_draw_ms": {
+        "n": 1194,
+        "p50": 0.560791,
+        "p95": 1.018125,
+        "p99": 1.0883749999999999,
+        "max": 1.242583
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 44.196717448259804,
+      "footprint_mb": 196.20401763916016,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "anim_native_200",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.004177125,
+      "fps": 120.04985367549658,
+      "draw_ms": {
+        "n": 1201,
+        "p50": 0.737375,
+        "p95": 0.9803749999999999,
+        "p99": 1.059958,
+        "max": 1.232125
+      },
+      "dirty_to_draw_ms": {
+        "n": 1201,
+        "p50": 0.742541,
+        "p95": 0.986125,
+        "p99": 1.065709,
+        "max": 1.265875
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 19.34594895529702,
+      "footprint_mb": 197.17276763916016,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "anim_native_1000",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.002296208,
+      "fps": 119.57254365686747,
+      "draw_ms": {
+        "n": 1196,
+        "p50": 2.207667,
+        "p95": 3.0892910000000002,
+        "p99": 3.466666,
+        "max": 3.770292
+      },
+      "dirty_to_draw_ms": {
+        "n": 1196,
+        "p50": 2.212,
+        "p95": 3.0932910000000002,
+        "p99": 3.4718750000000003,
+        "max": 3.7745830000000002
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 35.182661329159465,
+      "footprint_mb": 207.56341552734375,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "cooldown",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.002853958,
+      "fps": 5.328264452346703,
+      "draw_ms": {
+        "n": 16,
+        "p50": 2.269583,
+        "p95": 2.594917,
+        "p99": 2.868167,
+        "max": 2.868167
+      },
+      "dirty_to_draw_ms": {
+        "n": 16,
+        "p50": 2.2745,
+        "p95": 2.598334,
+        "p99": 2.871917,
+        "max": 2.871917
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 3.9356226327673474,
+      "footprint_mb": 155.43841552734375,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    }
+  ]
+}

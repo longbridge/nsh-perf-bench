@@ -1,0 +1,16 @@
+diff --git a/crates/nsh-core/src/reactive.rs b/crates/nsh-core/src/reactive.rs
+index 37ac580..d7852c7 100644
+--- a/crates/nsh-core/src/reactive.rs
++++ b/crates/nsh-core/src/reactive.rs
+@@ -670,6 +670,11 @@ pub fn run_updates<H: Host, R>(h: H, init: bool, f: impl FnOnce() -> R) -> R {
+     graph.exec += 1;
+     let r = f();
+     complete_updates(h, wait);
++    if !wait {
++        // The round ended: the runaway count starts over (the JS host also
++        // resets it when a call returns; Rust components have no such call).
++        g(h).reset_runs();
++    }
+     r
+ }
+ 

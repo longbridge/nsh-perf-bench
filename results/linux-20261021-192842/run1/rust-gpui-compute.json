@@ -1,0 +1,204 @@
+{
+  "implementation": "rust-gpui",
+  "scenario": "compute",
+  "startup_first_frame_ms": 226.67536,
+  "peak_footprint_mb": 0.0,
+  "phases": [
+    {
+      "name": "warmup",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.00006552,
+      "fps": 0.0,
+      "draw_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "dirty_to_draw_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 0.5588544612852313,
+      "footprint_mb": 0.0,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "compute_100k",
+      "rate": 0,
+      "scroll": false,
+      "secs": 15.000056519,
+      "fps": 0.0666664154720576,
+      "draw_ms": {
+        "n": 1,
+        "p50": 1.126513,
+        "p95": 1.126513,
+        "p99": 1.126513,
+        "max": 1.126513
+      },
+      "dirty_to_draw_ms": {
+        "n": 1,
+        "p50": 1.1538270000000002,
+        "p95": 1.1538270000000002,
+        "p99": 1.1538270000000002,
+        "max": 1.1538270000000002
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 4.3332703391929135,
+      "footprint_mb": 0.0,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": [
+        [
+          "agg_100k",
+          {
+            "n": 13,
+            "p50": 0.405305,
+            "p95": 0.8272,
+            "p99": 0.867904,
+            "max": 0.867904
+          }
+        ],
+        [
+          "ema_100k",
+          {
+            "n": 13,
+            "p50": 0.24191600000000002,
+            "p95": 0.24412699999999998,
+            "p99": 0.246993,
+            "max": 0.246993
+          }
+        ],
+        [
+          "json_5mb",
+          {
+            "n": 12,
+            "p50": 42.724702,
+            "p95": 44.107152,
+            "p99": 44.278851,
+            "max": 44.278851
+          }
+        ],
+        [
+          "sort_100k",
+          {
+            "n": 12,
+            "p50": 3.742478,
+            "p95": 4.697802,
+            "p99": 4.7428490000000005,
+            "max": 4.7428490000000005
+          }
+        ]
+      ]
+    },
+    {
+      "name": "compute_under_load",
+      "rate": 1000,
+      "scroll": false,
+      "secs": 10.000056763,
+      "fps": 117.89933076802876,
+      "draw_ms": {
+        "n": 1179,
+        "p50": 1.090066,
+        "p95": 1.603597,
+        "p99": 2.033366,
+        "max": 2.331067
+      },
+      "dirty_to_draw_ms": {
+        "n": 1179,
+        "p50": 1.116536,
+        "p95": 2.0641890000000003,
+        "p99": 2.4251799999999997,
+        "max": 4.200048
+      },
+      "tick_to_frame_ms": {
+        "n": 998,
+        "p50": 1.23607,
+        "p95": 6.5852,
+        "p99": 11.377208,
+        "max": 20.59149
+      },
+      "late_frames": 0,
+      "cpu_pct": 17.03992327628351,
+      "footprint_mb": 0.0,
+      "emitted_batches": 1000,
+      "applied_batches": 1000,
+      "emitted_rows": 10000,
+      "triggers": 0,
+      "compute_ms": [
+        [
+          "agg_100k",
+          {
+            "n": 25,
+            "p50": 0.386097,
+            "p95": 0.834813,
+            "p99": 1.289924,
+            "max": 1.289924
+          }
+        ]
+      ]
+    },
+    {
+      "name": "cooldown",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.000096838,
+      "fps": 5.666483756348668,
+      "draw_ms": {
+        "n": 17,
+        "p50": 1.290518,
+        "p95": 1.549199,
+        "p99": 1.985779,
+        "max": 1.985779
+      },
+      "dirty_to_draw_ms": {
+        "n": 17,
+        "p50": 1.310967,
+        "p95": 2.550491,
+        "p99": 2.99929,
+        "max": 2.99929
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 1.2863918094633215,
+      "footprint_mb": 0.0,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    }
+  ]
+}

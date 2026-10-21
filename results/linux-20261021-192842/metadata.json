@@ -1,0 +1,32 @@
+{
+  "system": "Linux",
+  "memory_supported": false,
+  "repetitions": 1,
+  "scenarios": [
+    "quotes",
+    "animation",
+    "interaction",
+    "compute"
+  ],
+  "implementations": [
+    "rust",
+    "nsh",
+    "hybrid",
+    "rustui"
+  ],
+  "quick": false,
+  "source_commit": "0347cf1bce560215b2133d7c17987cbb745efba6",
+  "nsh_commit": "d3655d32bff5c4b1346ea04f1e0d9fbde127e1cf",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+  "metadata_reconstructed": true,
+  "note": "Supplemented after the run; source revision and original runner recorded in SOURCES.txt. GPU identified after the run. Display configuration and driver version were not captured.",
+  "sha256": {
+    "Cargo.lock": "5d12ec2fadd78ddc04ce0939f6abe09c5c28cf8a5992f3d243db2cce3f1e6f9f",
+    "nsh-app/Cargo.lock": "82bbb53db773b62100d3a5ff461cbf74eedca22cacb05618f922b4d7b1d132b4",
+    "patches/nsh-001-reset-runaway-count.patch": "f1be28ced920168012237b9bfe6f8cc664ca8346d95f4255023ef4030227c605",
+    "target/release/bench-rust": "820db4cb102d003e12cf7e1616a181b09857b6581a12e800c0406c63ad2ad394",
+    "target-nsh/release/bench-nsh": "373855e75a9811ed1dd2e86d29e9d52bccd352071e6e9615932987ce41a37999",
+    "nsh-app/out/app/bundle.nshc": "07c7cfd388859a7de514bdb4562c1c7cf0962fa88882da1a02b60b17ecfc443b"
+  }
+}

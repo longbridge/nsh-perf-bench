@@ -1,0 +1,27 @@
+[package]
+name = "bench-nsh"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+bench-core = { path = "../core" }
+# NSH：实测版本 d3655d3 + PR #282 补丁，由 scripts/setup.sh 准备到 vendor/nsh
+nsh-platform-gpui = { path = "../vendor/nsh/crates/gpui/nsh-platform-gpui", features = ["runtime-shaders"] }
+nsh-core = { path = "../vendor/nsh/crates/nsh-core" }
+nsh-ui-mobile = { path = "../vendor/nsh/crates/nsh-ui-mobile" }
+gpui_platform = { package = "gpui-fast-platform", version = "0.1.9", default-features = false, features = ["font-kit"] }
+# 打开 GPUI profiler（与 Rust 版同一套帧指标）
+gpui-fast = { version = "0.1.9", default-features = false, features = ["profiler"] }
+futures = "0.3"
+serde_json = "1"
+env_logger = "0.11"
+log = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true

@@ -1,0 +1,10 @@
+[workspace]
+members = ["core", "rust-app"]
+exclude = ["nsh-app", "vendor"]
+resolver = "2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true

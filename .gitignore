@@ -1,0 +1,10 @@
+target/
+target-nsh/
+vendor/
+nsh-app/out/
+nsh-app/app/.nsh/
+*.log
+# 仅保留选定的基准数据集
+results/*
+!results/20261021-combined/
+!results/linux-20261021-192842/

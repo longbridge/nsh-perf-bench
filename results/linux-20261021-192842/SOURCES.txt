@@ -1,0 +1,17 @@
+本轮：Linux / Intel Core i7-13700KF，4 场景 × 4 实现，各 1 次，完整阶段时长。
+测量时基准源码：0347cf1；NSH：d3655d32bff5c4b1346ea04f1e0d9fbde127e1cf + patches/nsh-001-reset-runaway-count.patch。
+使用 release 构建。TSX 包由同版本 NSH CLI 构建。
+本轮由临时 Python runner 启动（当时 scripts/run.sh 使用 macOS 环境命令，不能直接用于 Linux）。
+按 quotes、animation、interaction、compute 顺序，每场景按 rust、nsh、hybrid、rustui 顺序运行，各进程间隔 2 秒。
+每个进程设置 BENCH_SCENARIO=<场景>、BENCH_OUT=results/linux-20261021-192842/run1。
+rust：./target/release/bench-rust
+nsh：./target-nsh/release/bench-nsh nsh-app/out/app（BENCH_MODE 未设置）
+hybrid：BENCH_MODE=hybrid ./target-nsh/release/bench-nsh nsh-app/out/app
+rustui：BENCH_MODE=rustui ./target-nsh/release/bench-nsh nsh-app/out/app
+未设置 BENCH_QUICK / BENCH_SOAK。冒烟结果没有混入本目录。
+16 个进程退出码均为 0，JSON 的阶段数为 quotes=8、animation=6、interaction=6、compute=4。
+metadata.json 为运行后补充。二进制、锁文件与补丁摘要在原构建产物仍存在时计算。
+运行后补充查询 GPU：NVIDIA GeForce RTX 3060 Ti GDDR6X；本轮未采集驱动版本、实际显示模式或持续窗口可见性。
+本轮内存值 0 为不支持采样的占位值；没有采样的延迟不是 0ms 响应。
+REPORT.md 由本次改进后的 report.py 生成；原始 JSON 未修改。
+GitHub 仓库已整理为全新初始提交；0347cf1 是原内部测量源码的来源记录，不能在公开历史中直接检出。性能工作负载内容未改动。

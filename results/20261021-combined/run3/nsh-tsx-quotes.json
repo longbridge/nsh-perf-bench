@@ -1,0 +1,296 @@
+{
+  "implementation": "nsh-tsx",
+  "scenario": "quotes",
+  "startup_first_frame_ms": 426.951042,
+  "peak_footprint_mb": 231.282,
+  "phases": [
+    {
+      "name": "warmup",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.000485875,
+      "fps": 0.33327935596430697,
+      "draw_ms": {
+        "n": 1,
+        "p50": 3.697791,
+        "p95": 3.697791,
+        "p99": 3.697791,
+        "max": 3.697791
+      },
+      "dirty_to_draw_ms": {
+        "n": 1,
+        "p50": 3.735166,
+        "p95": 3.735166,
+        "p99": 3.735166,
+        "max": 3.735166
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 4.032346927812149,
+      "footprint_mb": 119.34464263916016,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "idle",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.000747667,
+      "fps": 0.09999252388896414,
+      "draw_ms": {
+        "n": 1,
+        "p50": 3.683875,
+        "p95": 3.683875,
+        "p99": 3.683875,
+        "max": 3.683875
+      },
+      "dirty_to_draw_ms": {
+        "n": 1,
+        "p50": 3.740583,
+        "p95": 3.740583,
+        "p99": 3.740583,
+        "max": 3.740583
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 2.0461970126018176,
+      "footprint_mb": 121.32901763916016,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "r200",
+      "rate": 200,
+      "scroll": false,
+      "secs": 10.000126333,
+      "fps": 96.69877837532314,
+      "draw_ms": {
+        "n": 967,
+        "p50": 1.848875,
+        "p95": 2.787334,
+        "p99": 3.005291,
+        "max": 3.6609580000000004
+      },
+      "dirty_to_draw_ms": {
+        "n": 967,
+        "p50": 1.887458,
+        "p95": 2.83725,
+        "p99": 3.053249,
+        "max": 3.694791
+      },
+      "tick_to_frame_ms": {
+        "n": 995,
+        "p50": 7.2785,
+        "p95": 11.715209000000002,
+        "p99": 13.093584,
+        "max": 14.946875
+      },
+      "late_frames": 0,
+      "cpu_pct": 39.43188184520709,
+      "footprint_mb": 216.01654052734375,
+      "emitted_batches": 1000,
+      "applied_batches": 1000,
+      "emitted_rows": 2000,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "r1000",
+      "rate": 1000,
+      "scroll": false,
+      "secs": 10.003179292,
+      "fps": 99.16847144720757,
+      "draw_ms": {
+        "n": 992,
+        "p50": 1.7121250000000001,
+        "p95": 2.824792,
+        "p99": 2.990542,
+        "max": 3.292083
+      },
+      "dirty_to_draw_ms": {
+        "n": 992,
+        "p50": 1.737333,
+        "p95": 2.88625,
+        "p99": 3.036125,
+        "max": 3.329125
+      },
+      "tick_to_frame_ms": {
+        "n": 999,
+        "p50": 7.626583,
+        "p95": 11.680417,
+        "p99": 13.262333,
+        "max": 15.838000000000001
+      },
+      "late_frames": 0,
+      "cpu_pct": 40.199519398957094,
+      "footprint_mb": 217.25091552734375,
+      "emitted_batches": 1000,
+      "applied_batches": 1000,
+      "emitted_rows": 10000,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "r5000",
+      "rate": 5000,
+      "scroll": false,
+      "secs": 10.003729042,
+      "fps": 96.0641772648284,
+      "draw_ms": {
+        "n": 961,
+        "p50": 1.598208,
+        "p95": 2.7055830000000003,
+        "p99": 2.939375,
+        "max": 3.3322920000000003
+      },
+      "dirty_to_draw_ms": {
+        "n": 961,
+        "p50": 1.623791,
+        "p95": 2.741251,
+        "p99": 2.9893340000000004,
+        "max": 3.3814990000000003
+      },
+      "tick_to_frame_ms": {
+        "n": 996,
+        "p50": 8.354917,
+        "p95": 12.186125,
+        "p99": 13.249083,
+        "max": 18.252375
+      },
+      "late_frames": 0,
+      "cpu_pct": 40.694164974965354,
+      "footprint_mb": 219.07904052734375,
+      "emitted_batches": 1000,
+      "applied_batches": 1000,
+      "emitted_rows": 50000,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "r5000_scroll",
+      "rate": 5000,
+      "scroll": true,
+      "secs": 10.0021345,
+      "fps": 119.97439146614155,
+      "draw_ms": {
+        "n": 1200,
+        "p50": 1.5090839999999999,
+        "p95": 2.712084,
+        "p99": 2.95775,
+        "max": 3.2599579999999997
+      },
+      "dirty_to_draw_ms": {
+        "n": 1200,
+        "p50": 1.516375,
+        "p95": 2.740125,
+        "p99": 2.973917,
+        "max": 3.2753330000000003
+      },
+      "tick_to_frame_ms": {
+        "n": 998,
+        "p50": 6.554667,
+        "p95": 10.947999999999999,
+        "p99": 11.9,
+        "max": 15.104458
+      },
+      "late_frames": 0,
+      "cpu_pct": 49.535906560744614,
+      "footprint_mb": 229.29779052734375,
+      "emitted_batches": 1000,
+      "applied_batches": 1000,
+      "emitted_rows": 50000,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "r20000",
+      "rate": 20000,
+      "scroll": false,
+      "secs": 10.002654042,
+      "fps": 97.97399728962854,
+      "draw_ms": {
+        "n": 980,
+        "p50": 1.394667,
+        "p95": 1.559958,
+        "p99": 1.625458,
+        "max": 2.092167
+      },
+      "dirty_to_draw_ms": {
+        "n": 980,
+        "p50": 1.417708,
+        "p95": 1.583584,
+        "p99": 1.6646670000000001,
+        "max": 2.096084
+      },
+      "tick_to_frame_ms": {
+        "n": 999,
+        "p50": 8.591584,
+        "p95": 12.567083,
+        "p99": 13.889000000000001,
+        "max": 15.698500000000001
+      },
+      "late_frames": 0,
+      "cpu_pct": 54.450508606323744,
+      "footprint_mb": 231.28216552734375,
+      "emitted_batches": 1000,
+      "applied_batches": 1000,
+      "emitted_rows": 200000,
+      "triggers": 0,
+      "compute_ms": []
+    },
+    {
+      "name": "cooldown",
+      "rate": 0,
+      "scroll": false,
+      "secs": 5.0011325,
+      "fps": 0.9997735512906327,
+      "draw_ms": {
+        "n": 5,
+        "p50": 3.352333,
+        "p95": 4.831875,
+        "p99": 4.831875,
+        "max": 4.831875
+      },
+      "dirty_to_draw_ms": {
+        "n": 5,
+        "p50": 3.396042,
+        "p95": 4.873291,
+        "p99": 4.873291,
+        "max": 4.873291
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 3.161843842369731,
+      "footprint_mb": 178.82904052734375,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": []
+    }
+  ]
+}
