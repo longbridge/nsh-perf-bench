@@ -1,0 +1,8 @@
+Run: Linux / Intel Core i7-13700KF / NVIDIA RTX 3060 Ti, Hyprland 0.56.2, 3840x2160 @ 144 Hz; 4 scenarios x 4 implementations, 1 run each, full phase lengths.
+Command: scripts/run.sh 1 (release builds). NSH variants on the native backend (nsh-platform-linux, GTK 4.24); rust-gpui on gpui-kit 0.8.0 / gpui-fast 0.1.10.
+Source: branch perf-analysis (measured from the working tree before it was committed; metadata.json shows source_commit 0347cf1 + uncommitted changes, which are the commit that adds this directory).
+NSH: d3655d32bff5c4b1346ea04f1e0d9fbde127e1cf + patches/nsh-001-reset-runaway-count.patch + patches/nsh-002-perf-diagnostics.patch (all A/B switches off).
+Test windows were floating at 1600x1000 (scripts/window-rule.sh); the earlier Linux run (linux-20261021-192842) was most likely tiled to a smaller size.
+The binary links a counting global allocator (thread-local counters, for allocation diagnostics) in all NSH variants.
+Memory: not implemented on Linux; 0 in the raw JSON is a placeholder.
+Single run: no variance estimate. Diagnostic single runs with the profiling build measured 53-68% CPU at r20000 for the NSH variants vs 73-78% here; treat NSH-vs-NSH differences under ~5 points as noise.

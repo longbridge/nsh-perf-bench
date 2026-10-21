@@ -8,3 +8,4 @@ nsh-app/app/.nsh/
 results/*
 !results/20261021-combined/
 !results/linux-20261021-192842/
+!results/20261021-212102/

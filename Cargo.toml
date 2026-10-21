@@ -8,3 +8,9 @@ opt-level = 3
 lto = "thin"
 codegen-units = 4
 strip = true
+
+# 剖析用：与 release 相同的优化，保留符号与行号（samply / perf）
+[profile.profiling]
+inherits = "release"
+strip = false
+debug = "line-tables-only"

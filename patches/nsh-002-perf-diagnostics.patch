@@ -1,0 +1,529 @@
+diff --git i/crates/gpui/nsh-platform-gpui/src/render.rs w/crates/gpui/nsh-platform-gpui/src/render.rs
+index b11a7556..f39ad056 100644
+--- i/crates/gpui/nsh-platform-gpui/src/render.rs
++++ w/crates/gpui/nsh-platform-gpui/src/render.rs
+@@ -790,6 +790,8 @@ impl Element for SurfaceElement {
+             std::mem::take(&mut dcx.drawn)
+         };
+         surface.items_placed(drawn);
++        nsh_core::diag::add(nsh_core::diag::C::ui_paints, 1);
++        nsh_core::diag::since(nsh_core::diag::C::ui_paint_ns, start);
+         // Animations tick on the window's frames while they run (and stop
+         // asking when idle); a change made while painting (a frame client
+         // added, an item placed) is drawn in the next frame, as no entry
+diff --git i/crates/gpui/nsh-platform-gpui/src/surface.rs w/crates/gpui/nsh-platform-gpui/src/surface.rs
+index a9c12eae..fdf0ea4a 100644
+--- i/crates/gpui/nsh-platform-gpui/src/surface.rs
++++ w/crates/gpui/nsh-platform-gpui/src/surface.rs
+@@ -450,6 +450,8 @@ impl Surface {
+ 
+     /// Applies what the engine sent.
+     pub(crate) fn drain(self: &Rc<Self>) {
++        let _span = nsh_core::diag::Span::new(nsh_core::diag::C::ui_drain_ns);
++        nsh_core::diag::add(nsh_core::diag::C::ui_drains, 1);
+         self.pending.borrow().store(false, Ordering::Release);
+         let messages: Vec<Message> = match &*self.rx.borrow() {
+             Some(rx) => rx.try_iter().collect(),
+@@ -468,6 +470,8 @@ impl Surface {
+                     self.apply(&batch);
+                     applied = true;
+                     self.batches.set(self.batches.get() + 1);
++                    nsh_core::diag::add(nsh_core::diag::C::ui_batches, 1);
++                    nsh_core::diag::ui_applied(nsh_core::diag::get(nsh_core::diag::C::ui_batches), std::time::Instant::now());
+                 }
+                 Message::Error(error) => {
+                     log::error!("{error}");
+@@ -504,6 +508,7 @@ impl Surface {
+     fn apply(self: &Rc<Self>, batch: &MountBatch) {
+         crate::access::prepare(batch);
+         for item in &batch.items {
++            nsh_core::diag::count_item(item);
+             self.anim.borrow_mut().apply(item);
+             if !matches!(
+                 item,
+@@ -519,6 +524,7 @@ impl Surface {
+     /// Writes the animated values to the views and reports finished
+     /// animations.
+     pub(crate) fn write_animations(&self) {
++        let _span = nsh_core::diag::Span::new(nsh_core::diag::C::ui_anim_write_ns);
+         let finished = {
+             let mut anim = self.anim.borrow_mut();
+             anim.write(&self.mounter.borrow());
+@@ -554,6 +560,7 @@ impl Surface {
+     /// One animation frame (called while the surface is drawn, before its
+     /// views are).
+     pub(crate) fn tick(self: &Rc<Self>) {
++        let _span = nsh_core::diag::Span::new(nsh_core::diag::C::ui_tick_ns);
+         let now = self.clock();
+         if self.anim.borrow().animating() {
+             self.anim.borrow_mut().tick(now);
+@@ -594,6 +601,7 @@ pub(crate) fn flush_all(cx: &mut gpui::App) {
+             .collect()
+     });
+     for id in ids {
++        nsh_core::diag::add(nsh_core::diag::C::ui_notifies, 1);
+         cx.notify(id);
+     }
+ }
+diff --git i/crates/nsh-core/src/core/mod.rs w/crates/nsh-core/src/core/mod.rs
+index 0303d17a..e0d1dd03 100644
+--- i/crates/nsh-core/src/core/mod.rs
++++ w/crates/nsh-core/src/core/mod.rs
+@@ -1173,8 +1173,14 @@ impl<M: TextEngine> Core<M> {
+     /// One round of a commit: views, layout, lists, commands, into the
+     /// mount items.
+     fn commit_round(&mut self) {
++        use crate::diag::{C, add, since};
++        use std::time::Instant as T;
++        add(C::core_rounds, 1);
++        let t = T::now();
+         // The views' patches and the views to make first.
+         self.render_components();
++        since(C::core_render_ns, t);
++        let t = T::now();
+         self.sync_back();
+         self.sync_keys();
+         // Platforms animate the frames, insertions and removals that follow
+@@ -1183,12 +1189,18 @@ impl<M: TextEngine> Core<M> {
+             self.mount.insert(0, MountItem::LayoutAnimation(animation));
+         }
+         self.flush_dirty();
++        since(C::core_flush_ns, t);
++        let t = T::now();
+         let relayout = self.needs_layout;
+         if relayout {
+             self.needs_layout = false;
+             // Only walk the main tree when it was laid out again (a change
+             // inside a list cell leaves it untouched).
+-            if self.layout_main() {
++            let main = self.layout_main();
++            since(C::core_layout_ns, t);
++            let t = T::now();
++            if main {
++                add(C::core_layout_main, 1);
+                 let root = self.root;
+                 let children = std::mem::take(&mut self.nodes[root as usize].children);
+                 for &child in &children {
+@@ -1198,12 +1210,19 @@ impl<M: TextEngine> Core<M> {
+                 }
+                 self.nodes[root as usize].children = children;
+             }
++            since(C::core_emit_ns, t);
++            let t = T::now();
+             // Screens and modals, then list cells (lists may live in them).
+             self.layout_roots();
+             self.layout_cells();
++            since(C::core_layout_ns, t);
+         }
++        let t = T::now();
+         self.update_lists(relayout);
++        since(C::core_lists_ns, t);
++        let t = T::now();
+         self.flush_text();
++        since(C::core_text_ns, t);
+         // What this turn's status bar settings add up to, once.
+         if let Some(config) = StatusBars::take_changed(&self.components.status_bars) {
+             self.commands
+@@ -1549,6 +1568,16 @@ impl<M: TextEngine> Core<M> {
+             }
+             _ => {}
+         }
++        self.set_layout_style(layout, style);
++    }
++
++    /// Gives taffy a node's layout style; an unchanged one (a transform,
++    /// opacity or color change) leaves the layout clean.
++    fn set_layout_style(&mut self, layout: taffy::NodeId, style: taffy::Style) {
++        if layout_diff() && self.layout.style(layout).is_ok_and(|old| *old == style) {
++            crate::diag::add(crate::diag::C::core_layout_skipped, 1);
++            return;
++        }
+         self.layout.set_style(layout, style).expect("taffy style");
+         self.needs_layout = true;
+     }
+@@ -1640,8 +1669,7 @@ impl<M: TextEngine> Core<M> {
+             node.base_layout = Some(Box::new(layout));
+             self.sync_layout_style(key);
+         } else if let Some(l) = node.layout {
+-            self.layout.set_style(l, layout).expect("taffy style");
+-            self.needs_layout = true;
++            self.set_layout_style(l, layout);
+         }
+         let mut flags = 0;
+         if view_changed {
+@@ -4631,9 +4659,23 @@ fn measure_text<M: TextEngine>(
+     {
+         return size;
+     }
+-    let size = match cache.get(ctx.layout_hash, max_width) {
++    crate::diag::add(crate::diag::C::text_measure_calls, 1);
++    // An unwrapped measure that fits `max_width` is the wrapped one too:
++    // nothing breaks or ellipsizes (perf-bench A/B: BENCH_TEXT_REUSE=1).
++    let mut hit = cache.get(ctx.layout_hash, max_width);
++    if hit.is_none()
++        && text_reuse()
++        && let Some(w) = max_width
++        && let Some(unwrapped) = cache.get(ctx.layout_hash, None)
++        && unwrapped.width <= w
++    {
++        crate::diag::add(crate::diag::C::text_measures_reused, 1);
++        hit = Some(unwrapped);
++    }
++    let size = match hit {
+         Some(size) => size,
+         None => {
++            crate::diag::add(if max_width.is_some() { crate::diag::C::text_measures_wrapped } else { crate::diag::C::text_measures_unwrapped }, 1);
+             let prepared = ctx
+                 .prepared
+                 .get_or_insert_with(|| engine.prepare(&ctx.text));
+@@ -4752,3 +4794,15 @@ fn leaf_context<P>(kind: Kind) -> Option<LeafContext<P>> {
+         _ => None,
+     }
+ }
++
++/// perf-bench A/B: BENCH_LAYOUT_DIFF=1 skips relayout for unchanged layout styles.
++fn layout_diff() -> bool {
++    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *ON.get_or_init(|| std::env::var("BENCH_LAYOUT_DIFF").is_ok_and(|v| v == "1"))
++}
++
++/// perf-bench A/B: BENCH_TEXT_REUSE=1 reuses a fitting unwrapped measure.
++fn text_reuse() -> bool {
++    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *ON.get_or_init(|| std::env::var("BENCH_TEXT_REUSE").is_ok_and(|v| v == "1"))
++}
+diff --git i/crates/nsh-core/src/diag.rs w/crates/nsh-core/src/diag.rs
+new file mode 100644
+index 00000000..23e82d88
+--- /dev/null
++++ w/crates/nsh-core/src/diag.rs
+@@ -0,0 +1,126 @@
++//! Benchmark diagnostics (perf-bench patch): process-wide counters the
++//! engine, the core and the GPUI platform add to, read by the benchmark at
++//! phase boundaries. Relaxed atomics only; a span costs two clock reads.
++
++use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
++use std::sync::Mutex;
++use std::time::Instant;
++
++macro_rules! counters {
++    ($($name:ident),* $(,)?) => {
++        /// A counter.
++        #[allow(non_camel_case_types, missing_docs)]
++        #[derive(Clone, Copy, Debug)]
++        #[repr(usize)]
++        pub enum C { $($name),* }
++        /// Counter names, in order.
++        pub const NAMES: &[&str] = &[$(stringify!($name)),*];
++    };
++}
++
++counters!(
++    // engine thread
++    eng_wakes, eng_busy_ns, eng_tasks_ns, eng_commit_ns, eng_commit_js_ns, eng_apply_ops_ns, eng_ops, eng_submits, eng_items,
++    // core commit rounds
++    core_rounds, core_layout_skipped, core_render_ns, core_flush_ns, core_layout_ns, core_layout_main, core_emit_ns, core_lists_ns, core_text_ns,
++    // text measuring (layout)
++    text_measure_calls, text_measures_unwrapped, text_measures_wrapped, text_measures_reused,
++    // reactive graph
++    rx_computations,
++    // mount items produced, by kind
++    it_frame, it_style, it_text, it_create, it_insert, it_remove, it_other,
++    // main thread
++    ui_drains, ui_drain_ns, ui_batches, ui_tick_ns, ui_anim_write_ns, ui_paint_ns, ui_paints, ui_notifies,
++);
++
++static VALUES: [AtomicU64; NAMES.len()] = [const { AtomicU64::new(0) }; NAMES.len()];
++
++/// Adds `v` to `c`.
++#[inline]
++pub fn add(c: C, v: u64) {
++    VALUES[c as usize].fetch_add(v, Relaxed);
++}
++
++/// The current value of `c`.
++pub fn get(c: C) -> u64 {
++    VALUES[c as usize].load(Relaxed)
++}
++
++/// All counters, by name.
++pub fn snapshot() -> Vec<(&'static str, u64)> {
++    NAMES.iter().zip(VALUES.iter()).map(|(n, v)| (*n, v.load(Relaxed))).collect()
++}
++
++/// Adds the time since `start` to `c`, in nanoseconds.
++#[inline]
++pub fn since(c: C, start: Instant) {
++    add(c, start.elapsed().as_nanos() as u64);
++}
++
++/// Times a scope into `c`.
++pub struct Span(C, Instant);
++impl Span {
++    /// Starts timing.
++    #[inline]
++    pub fn new(c: C) -> Span {
++        Span(c, Instant::now())
++    }
++}
++impl Drop for Span {
++    fn drop(&mut self) {
++        since(self.0, self.1);
++    }
++}
++
++/// When the main thread applied each mount batch (1-based, in the order the
++/// engine submitted them): the last ones, for matching draws to commits.
++static APPLIED: Mutex<Vec<(u64, Instant)>> = Mutex::new(Vec::new());
++
++/// The main thread applied batch number `n` at `at`.
++pub fn ui_applied(n: u64, at: Instant) {
++    let mut v = APPLIED.lock().unwrap();
++    if v.len() >= 1 << 16 {
++        v.drain(..1 << 15);
++    }
++    v.push((n, at));
++}
++
++/// When batch number `n` was applied on the main thread, if it was yet.
++pub fn ui_applied_at(n: u64) -> Option<Instant> {
++    let v = APPLIED.lock().unwrap();
++    let i = v.partition_point(|x| x.0 < n);
++    v.get(i).filter(|x| x.0 == n).map(|x| x.1)
++}
++
++/// Counts a mount item applied on the main thread, by kind.
++pub fn count_item(item: &crate::MountItem) {
++    use crate::MountItem as M;
++    add(
++        match item {
++            M::Frame { .. } => C::it_frame,
++            M::ViewStyle { .. } => C::it_style,
++            M::Text { .. } => C::it_text,
++            M::Create { .. } => C::it_create,
++            M::Insert { .. } => C::it_insert,
++            M::Remove { .. } | M::Delete { .. } => C::it_remove,
++            _ => C::it_other,
++        },
++        1,
++    );
++}
++
++/// A platform without a frame profiler reports the main-thread work that
++/// put a frame on screen (start, end) here; the benchmark installs the hook.
++static FRAME_HOOK: std::sync::OnceLock<fn(Instant, Instant)> = std::sync::OnceLock::new();
++
++/// Installs the frame hook ([`frame`]).
++pub fn set_frame_hook(f: fn(Instant, Instant)) {
++    let _ = FRAME_HOOK.set(f);
++}
++
++/// One frame of main-thread work that changed what the screen shows.
++pub fn frame(start: Instant, end: Instant) {
++    if let Some(f) = FRAME_HOOK.get() {
++        f(start, end);
++    }
++}
+diff --git i/crates/nsh-core/src/lib.rs w/crates/nsh-core/src/lib.rs
+index e14a6d41..d044653a 100644
+--- i/crates/nsh-core/src/lib.rs
++++ w/crates/nsh-core/src/lib.rs
+@@ -14,6 +14,7 @@ mod core;
+ mod css;
+ mod css_named;
+ pub mod desktop;
++pub mod diag;
+ mod effects;
+ mod fenwick;
+ mod geometry;
+diff --git i/crates/nsh-core/src/reactive.rs w/crates/nsh-core/src/reactive.rs
+index d7852c78..70553365 100644
+--- i/crates/nsh-core/src/reactive.rs
++++ w/crates/nsh-core/src/reactive.rs
+@@ -805,6 +805,7 @@ fn look_upstream<H: Host>(h: H, id: u32, ignore: u32) {
+ 
+ /// Solid's `updateComputation`: cleans the node and runs it again.
+ pub fn update_computation<H: Host>(h: H, id: u32) {
++    crate::diag::add(crate::diag::C::rx_computations, 1);
+     let graph = g(h);
+     if graph.nodes[id as usize].disposed || graph.nodes[id as usize].kind == Kind::Free {
+         return;
+diff --git i/crates/nsh-engine/src/lib.rs w/crates/nsh-engine/src/lib.rs
+index b1d828be..d98a3196 100644
+--- i/crates/nsh-engine/src/lib.rs
++++ w/crates/nsh-engine/src/lib.rs
+@@ -961,6 +961,8 @@ fn run<M: TextEngine + 'static, S: MountSink>(
+             },
+         };
+         let started = driver.state.perf.is_some().then(Instant::now);
++        let busy = std::time::Instant::now();
++        nsh_core::diag::add(nsh_core::diag::C::eng_wakes, 1);
+         if let Some(message) = message {
+             if !driver.handle(message) {
+                 return;
+@@ -977,6 +979,7 @@ fn run<M: TextEngine + 'static, S: MountSink>(
+         if rx.is_empty() {
+             driver.collect_if_idle();
+         }
++        nsh_core::diag::since(nsh_core::diag::C::eng_busy_ns, busy);
+     }
+ }
+ 
+@@ -1261,6 +1264,7 @@ impl<M: TextEngine + 'static> Driver<M> {
+         } = self;
+         let script = script.as_ref();
+         let turn_start = state.trace.then(Instant::now);
++        let tasks_start = std::time::Instant::now();
+         state.dispatch_touch_move(script);
+         if state
+             .next_hover_move()
+@@ -1277,11 +1281,17 @@ impl<M: TextEngine + 'static> Driver<M> {
+             script.run_timers(Instant::now());
+         }
+         state.core.run_component_tasks();
++        nsh_core::diag::since(nsh_core::diag::C::eng_tasks_ns, tasks_start);
+         // What JS timers and Rust component tasks took; a Rust component
+         // renders in the commit.
+         let tasks = turn_start.map(|s| s.elapsed());
+         state.load_fonts(script, assets.as_deref(), &**sink);
+-        if let Some(batch) = state.commit(script) {
++        let commit_start = std::time::Instant::now();
++        let committed = state.commit(script);
++        nsh_core::diag::since(nsh_core::diag::C::eng_commit_ns, commit_start);
++        if let Some(batch) = committed {
++            nsh_core::diag::add(nsh_core::diag::C::eng_submits, 1);
++            nsh_core::diag::add(nsh_core::diag::C::eng_items, batch.items.len() as u64);
+             sink.submit(batch);
+             if let (Some(start), Some(tasks)) = (turn_start, tasks) {
+                 log::info!(
+@@ -1312,6 +1322,8 @@ impl<M: TextEngine + 'static> Driver<M> {
+             self.last_gc = Instant::now();
+             self.state.committed_since_gc = false;
+             if let Some(batch) = self.state.commit(Some(script)) {
++                nsh_core::diag::add(nsh_core::diag::C::eng_submits, 1);
++                nsh_core::diag::add(nsh_core::diag::C::eng_items, batch.items.len() as u64);
+                 self.sink.submit(batch);
+             }
+         }
+@@ -1744,6 +1756,9 @@ impl<M: TextEngine> State<M> {
+                 script.take_ops(&mut self.ops);
+             }
+             js += js_start.elapsed();
++            nsh_core::diag::add(nsh_core::diag::C::eng_commit_js_ns, js_start.elapsed().as_nanos() as u64);
++            nsh_core::diag::add(nsh_core::diag::C::eng_ops, self.ops.len() as u64);
++            let apply_start = std::time::Instant::now();
+             op_count += self.ops.len();
+             // A stop drops the rest of the ops, releasing what they hold
+             // for Rust classes.
+@@ -1767,6 +1782,7 @@ impl<M: TextEngine> State<M> {
+                     Err(err) => log::error!("invalid op: {err:?}"),
+                 }
+             }
++            nsh_core::diag::since(nsh_core::diag::C::eng_apply_ops_ns, apply_start);
+             if let Some(batch) = self.core.commit() {
+                 match &mut merged {
+                     Some(m) => extend_frame(&mut m.items, batch.items),
+diff --git i/crates/nsh-platform-linux/src/surface.rs w/crates/nsh-platform-linux/src/surface.rs
+index 2b513fe8..1e2ecca3 100644
+--- i/crates/nsh-platform-linux/src/surface.rs
++++ w/crates/nsh-platform-linux/src/surface.rs
+@@ -273,6 +273,8 @@ impl Surface {
+ 
+     /// Applies what the engine sent.
+     fn drain(self: &Rc<Self>) {
++        let _span = nsh_core::diag::Span::new(nsh_core::diag::C::ui_drain_ns);
++        nsh_core::diag::add(nsh_core::diag::C::ui_drains, 1);
+         self.pending.borrow().store(false, Ordering::Release);
+         let messages: Vec<Message> = match &*self.rx.borrow() {
+             Some(rx) => rx.try_iter().collect(),
+@@ -284,6 +286,8 @@ impl Surface {
+                 Message::Batch(batch) => {
+                     self.apply(&batch);
+                     applied = true;
++                    nsh_core::diag::add(nsh_core::diag::C::ui_batches, 1);
++                    nsh_core::diag::ui_applied(nsh_core::diag::get(nsh_core::diag::C::ui_batches), std::time::Instant::now());
+                 }
+                 Message::Error(message) => {
+                     log::error!("{message}");
+@@ -308,6 +312,7 @@ impl Surface {
+     fn apply(self: &Rc<Self>, batch: &MountBatch) {
+         crate::access::prepare(batch);
+         for item in &batch.items {
++            nsh_core::diag::count_item(item);
+             self.anim.borrow_mut().apply(item);
+             if !matches!(
+                 item,
+@@ -322,6 +327,7 @@ impl Surface {
+     /// Writes the animated values to the views and reports finished
+     /// animations.
+     pub(crate) fn write_animations(&self) {
++        let _span = nsh_core::diag::Span::new(nsh_core::diag::C::ui_anim_write_ns);
+         let finished = {
+             let mut anim = self.anim.borrow_mut();
+             anim.write(&self.mounter.borrow());
+@@ -356,6 +362,7 @@ impl Surface {
+     }
+ 
+     fn tick(&self, now: f64) {
++        let _span = nsh_core::diag::Span::new(nsh_core::diag::C::ui_tick_ns);
+         if self.anim.borrow().animating() {
+             self.anim.borrow_mut().tick(now);
+             self.write_animations();
+diff --git i/crates/nsh-platform-macos/src/surface.rs w/crates/nsh-platform-macos/src/surface.rs
+index 290be40d..43e66ee6 100644
+--- i/crates/nsh-platform-macos/src/surface.rs
++++ w/crates/nsh-platform-macos/src/surface.rs
+@@ -437,6 +437,8 @@ impl Surface {
+ 
+     /// Applies what the engine sent.
+     fn drain(self: &Rc<Self>) {
++        let diag_start = std::time::Instant::now();
++        nsh_core::diag::add(nsh_core::diag::C::ui_drains, 1);
+         let monitor = self.perf.borrow().clone();
+         let start = monitor.as_ref().map(|_| Instant::now());
+         self.pending.borrow().store(false, Ordering::Release);
+@@ -458,6 +460,10 @@ impl Surface {
+             // Core Animation's commit (drawing what changed) included.
+             monitor.record_work(start.elapsed(), applied);
+         }
++        nsh_core::diag::since(nsh_core::diag::C::ui_drain_ns, diag_start);
++        if applied {
++            nsh_core::diag::frame(diag_start, std::time::Instant::now());
++        }
+         self.ensure_ticking();
+     }
+ 
+@@ -470,6 +476,8 @@ impl Surface {
+                     monitor.record_latency(sent.elapsed());
+                 }
+                 self.apply(&batch);
++                nsh_core::diag::add(nsh_core::diag::C::ui_batches, 1);
++                nsh_core::diag::ui_applied(nsh_core::diag::get(nsh_core::diag::C::ui_batches), std::time::Instant::now());
+                 return true;
+             }
+             Message::Error(message) => {
+@@ -492,6 +500,7 @@ impl Surface {
+     fn apply(self: &Rc<Self>, batch: &MountBatch) {
+         crate::access::prepare(batch);
+         for item in &batch.items {
++            nsh_core::diag::count_item(item);
+             self.anim.borrow_mut().apply(item);
+             if !matches!(
+                 item,
+@@ -630,8 +639,15 @@ impl Surface {
+     /// One display frame at `now`, `period` seconds after the previous one
+     /// (the display link's, or the fallback timer's).
+     fn frame(self: &Rc<Self>, now: f64, period: f64) {
++        let diag_start = std::time::Instant::now();
++        let animating = self.wants_frames();
+         let Some(monitor) = self.perf.borrow().clone() else {
+-            return quiet(|| self.tick(now));
++            quiet(|| self.tick(now));
++            nsh_core::diag::since(nsh_core::diag::C::ui_tick_ns, diag_start);
++            if animating {
++                nsh_core::diag::frame(diag_start, std::time::Instant::now());
++            }
++            return;
+         };
+         let start = Instant::now();
+         let dirty = self.wants_frames();

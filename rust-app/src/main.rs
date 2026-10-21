@@ -122,7 +122,7 @@ impl Render for Bench {
         let phase = bench_core::schedule()[self.driver.phase.load(Ordering::Relaxed)].name;
 
         let body: AnyElement = match kind {
-            "anim_js" | "anim_native" => {
+            "anim_js" | "anim_js_tx" | "anim_js_curve" | "anim_native" => {
                 // 逐帧：每个方块按正弦位移，透明度随相位变化
                 window.request_animation_frame();
                 let t = self.anim_t0.elapsed().as_secs_f32();
@@ -133,9 +133,14 @@ impl Render for Bench {
                     .overflow_hidden()
                     .children((0..n).map(|i| {
                         let ph = t * std::f32::consts::TAU * 0.5 + i as f32 * 0.1;
-                        let x = (ph.sin() * 0.5 + 0.5) * 1400.;
+                        // animation_ab：anim_js_curve 走原生动画的轨迹；GPUI 没有 transform，位移都用 left
+                        let (x, a) = if kind == "anim_js_curve" {
+                            let (x, a) = bench_core::native_curve(i, t as f64 * 1000.0);
+                            (x as f32, a as f32)
+                        } else {
+                            ((ph.sin() * 0.5 + 0.5) * 1400., 0.3 + 0.7 * ph.cos().powi(2))
+                        };
                         let y = (i % 40) as f32 * 22. + 4.;
-                        let a = 0.3 + 0.7 * ph.cos().powi(2);
                         let c = if i % 2 == 0 { up() } else { down() };
                         div().absolute().left(px(x)).top(px(y)).size(px(16.)).rounded(px(2.)).bg(c.opacity(a))
                     }))
@@ -439,7 +444,12 @@ fn main() {
                         std::hint::black_box(x);
                     }
                     kind => {
-                        metrics.on_trigger();
+                        if kind == "tab" {
+                            let to_detail = v.read_with(cx, |this, _| this.tab == 0);
+                            metrics.on_trigger_labeled(Some(if to_detail { "to_detail" } else { "to_list" }));
+                        } else {
+                            metrics.on_trigger();
+                        }
                         let _ = v.update(cx, |this, cx| {
                             match kind {
                                 "select" => this.selected = (this.selected + 1) % this.rows.len(),
@@ -484,7 +494,7 @@ fn main() {
                         cx.notify();
                     }
                     // 进入动画阶段时重置起点
-                    if !matches!(this.kind(), "anim_js" | "anim_native") {
+                    if !this.kind().starts_with("anim_") {
                         this.anim_t0 = Instant::now();
                     } else {
                         // 动画阶段：确保开始逐帧（之后由 request_animation_frame 持续）

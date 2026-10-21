@@ -15,7 +15,8 @@ for impl in $IM; do
   case "$impl" in
     rust) test -x target/release/bench-rust ;;
     nsh|hybrid) test -x target-nsh/release/bench-nsh && test -f nsh-app/out/app/bundle.nshc ;;
-    rustui) test -x target-nsh/release/bench-nsh ;;
+    rustui|rustui-gpui) test -x target-nsh/release/bench-nsh ;;
+    nsh-gpui|hybrid-gpui) test -x target-nsh/release/bench-nsh && test -f nsh-app/out/app/bundle.nshc ;;
     *) echo "未知实现：$impl" >&2; exit 1 ;;
   esac || { echo '缺少基准程序或 TSX 包，请先运行 scripts/setup.sh' >&2; exit 1; }
 done
@@ -28,6 +29,7 @@ if p == pathlib.Path('/tmp') or pathlib.Path('/tmp') in p.parents or p == root o
     sys.exit('TMPDIR 必须位于 /tmp 和 Git 工作区以外')
 PYCODE
 mkdir -p "$TMPDIR"
+source scripts/window-rule.sh
 OUT=results/$(date +%Y%m%d-%H%M%S)
 if [[ -n "${BENCH_QUICK+x}" ]]; then OUT=results/quick-${OUT#results/}; fi
 mkdir -p results
@@ -38,14 +40,14 @@ out, count, scenarios, impls = sys.argv[1:]
 def command(*args):
     p = subprocess.run(args, text=True, capture_output=True)
     return p.stdout.strip() if p.returncode == 0 else 'unavailable'
-files = ['Cargo.lock', 'nsh-app/Cargo.lock', 'patches/nsh-001-reset-runaway-count.patch']
+files = ['Cargo.lock', 'nsh-app/Cargo.lock', 'patches/nsh-001-reset-runaway-count.patch', 'patches/nsh-002-perf-diagnostics.patch']
 if 'rust' in impls.split(): files.append('target/release/bench-rust')
 if set(impls.split()) - {'rust'}: files.append('target-nsh/release/bench-nsh')
-if set(impls.split()) & {'nsh', 'hybrid'}: files.append('nsh-app/out/app/bundle.nshc')
+if set(impls.split()) & {'nsh', 'hybrid', 'nsh-gpui', 'hybrid-gpui'}: files.append('nsh-app/out/app/bundle.nshc')
 meta = dict(platform=platform.platform(), system=platform.system(),
             memory_supported=platform.system() == 'Darwin',
             repetitions=int(count), scenarios=scenarios.split(), implementations=impls.split(),
-            quick='BENCH_QUICK' in os.environ, source_commit=command('git', 'rev-parse', 'HEAD'),
+            quick='BENCH_QUICK' in os.environ, nsh_backend='native', source_commit=command('git', 'rev-parse', 'HEAD'),
             source_dirty=bool(command('git', 'status', '--porcelain')),
             nsh_commit=command('git', '-C', 'vendor/nsh', 'rev-parse', 'HEAD'),
             rustc=command('rustc', '--version'), cargo=command('cargo', '--version'),
@@ -67,10 +69,16 @@ for s in $SC; do
         nsh) name=nsh-tsx; cmd=(./target-nsh/release/bench-nsh nsh-app/out/app) ;;
         hybrid) name=nsh-hybrid; mode=hybrid; cmd=(./target-nsh/release/bench-nsh nsh-app/out/app) ;;
         rustui) name=nsh-rust; mode=rustui; cmd=(./target-nsh/release/bench-nsh nsh-app/out/app) ;;
+        # 对照：同样三种写法跑在 nsh-platform-gpui 上
+        nsh-gpui) name=nsh-tsx-gpui; cmd=(./target-nsh/release/bench-nsh nsh-app/out/app) ;;
+        hybrid-gpui) name=nsh-hybrid-gpui; mode=hybrid; cmd=(./target-nsh/release/bench-nsh nsh-app/out/app) ;;
+        rustui-gpui) name=nsh-rust-gpui; mode=rustui; cmd=(./target-nsh/release/bench-nsh nsh-app/out/app) ;;
       esac
+      backend=native
+      [[ $impl == *-gpui ]] && backend=gpui
       log="$OUT/run$i-$s-$impl.log"
       # 保留完整 stderr 和退出码；首帧一直不来时最多等待 180 秒。
-      if ! BENCH_MODE=$mode BENCH_SCENARIO=$s BENCH_OUT=$OUT/run$i python3 - "${cmd[@]}" > "$log" 2>&1 <<'PY'
+      if ! BENCH_BACKEND=$backend BENCH_MODE=$mode BENCH_SCENARIO=$s BENCH_OUT=$OUT/run$i python3 - "${cmd[@]}" > "$log" 2>&1 <<'PY'
 import subprocess, sys
 try:
     sys.exit(subprocess.run(sys.argv[1:], timeout=180).returncode)

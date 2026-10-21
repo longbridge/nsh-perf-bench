@@ -1,0 +1,33 @@
+{
+  "platform": "Linux-7.2.8-9-omarchy-x86_64-with-glibc2.44",
+  "system": "Linux",
+  "memory_supported": false,
+  "repetitions": 1,
+  "scenarios": [
+    "quotes",
+    "animation",
+    "interaction",
+    "compute"
+  ],
+  "implementations": [
+    "rust",
+    "nsh",
+    "hybrid",
+    "rustui"
+  ],
+  "quick": false,
+  "nsh_backend": "native",
+  "source_commit": "0347cf1bce560215b2133d7c17987cbb745efba6",
+  "source_dirty": true,
+  "nsh_commit": "d3655d32bff5c4b1346ea04f1e0d9fbde127e1cf",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+  "sha256": {
+    "Cargo.lock": "5d12ec2fadd78ddc04ce0939f6abe09c5c28cf8a5992f3d243db2cce3f1e6f9f",
+    "nsh-app/Cargo.lock": "843b0747d408af67e3ce225dadad2e64aa6255b343c2e401a65acafdfbd7e4e2",
+    "patches/nsh-001-reset-runaway-count.patch": "f1be28ced920168012237b9bfe6f8cc664ca8346d95f4255023ef4030227c605",
+    "target/release/bench-rust": "572e3c0e398989955ca6579a0507911aa7692664f2f4f0f5888186a3c2d777f6",
+    "target-nsh/release/bench-nsh": "ef6ad10fe9860867ca3b9a792c56760db7e37f808bf40769c1e1f15acd7b1bb8",
+    "nsh-app/out/app/bundle.nshc": "bd52f6256d26d4ad9c5719c926db98dcb9e668900b3c8cbed7e6495bfcf57e0c"
+  }
+}
