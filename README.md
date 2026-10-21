@@ -1,6 +1,6 @@
 # NSH 技术方案性能基准
 
-同一份界面、同一份数据、同一个 GPUI 渲染引擎（gpui-fast，版本见下），比较四种写法的帧率、延迟、CPU、内存和计算耗时。
+同一份界面、同一份数据、同一个 GPUI Fast 渲染引擎（gpui-fast，GPUI 的优化分支，版本见下），比较四种写法的帧率、延迟、CPU、内存和计算耗时。
 
 ## 1. 三步上手
 
@@ -19,7 +19,7 @@ Linux 已在本仓库的固定依赖版本上编译运行通过；需要可见�
 
 跑完看 `results/<时间>/REPORT.md`（冒烟在 `results/quick-<时间>/`）。
 
-**跑的时候必须：亮屏、不锁屏、外接电源、不操作电脑。** 屏幕上会轮流弹出 1600×1000 的测试窗口，每个跑完自动关闭。窗口被遮挡、失焦或锁屏都会让帧率和 CPU 失真（锁屏时 GPUI 不绘制）。
+**跑的时候必须：亮屏、不锁屏、外接电源、不操作电脑。** 屏幕上会轮流弹出 1600×1000 的测试窗口，每个跑完自动关闭。窗口被遮挡、失焦或锁屏都会让帧率和 CPU 失真（锁屏时 GPUI Fast 不绘制）。
 
 ## 2. 四种写法
 
@@ -30,7 +30,7 @@ NSH 三种写法默认跑在**本平台的原生后端**上：Linux 是 `nsh-pla
 | `nsh` | `nsh-tsx` | **纯 TSX**：界面与逻辑在 TSX（QuickJS），行情以 JSON 进 JS 写 signal | `nsh-app/app/App.tsx`、`nsh-app/app/work.ts`；宿主 `nsh-app/src/main.rs` |
 | `hybrid` | `nsh-hybrid` | **TSX + Rust 模块**：界面在 TSX；行情合并 / 格式化、过滤、计算在 NSH 的 Rust 模块 | 同上，`BENCH_MODE=hybrid`（`main.rs` 中 `agg_*` 与 `#[module] Bench`，`App.tsx` 中 `HY` 分支） |
 | `rustui` | `nsh-rust` | **NSH Rust**：界面用 NSH 的 Rust 写法（`nsh_core::ui`：`#[component]`、`view()`、signal），无 QuickJS | `nsh-app/src/rustui.rs`，`BENCH_MODE=rustui` |
-| `rust` | `rust-gpui` | **纯 Rust（gpui-kit）**：直接写 GPUI（gpui-fast 0.1.10），不经过 NSH，作为参照 | `rust-app/src/main.rs` |
+| `rust` | `rust-gpui` | **纯 Rust（gpui-kit）**：直接写 GPUI Fast（gpui-fast 0.1.10），不经过 NSH，作为参照 | `rust-app/src/main.rs` |
 
 公共部分 `core/src/lib.rs`：确定性行情生成器（固定随机种子，四种写法收到的行情输入一致）、阶段编排、指标统计、计算任务算法。计算 / 过滤数据在 TS 与 Rust 中使用不同的伪随机生成器，算法和规模相同，数值并非逐位相同。
 
@@ -84,7 +84,7 @@ gpui-kit 没有对应的原生动画值，B3 / B4 与 B1 / B2 是同一种实现
 
 | 指标 | 含义 | 怎么算（`core/src/lib.rs` 的 `Metrics`） |
 |---|---|---|
-| 启动到首帧 ms | 进入 `main` 后到首个 present（不含进程装载） | GPUI profiler 首个 present |
+| 启动到首帧 ms | 进入 `main` 后到首个 present（不含进程装载） | GPUI Fast profiler 首个 present |
 | 峰值内存 MB | 各阶段结束时内存采样的最大值（不是连续采样峰值） | `phys_footprint`（活动监视器"内存"列同口径） |
 | fps | 每秒实际绘制帧数，有变化才绘制。**行情场景不代表快慢**：推送每 10ms 一批，帧数主要由“触发了多少次重画”决定，见第 6 节 | profiler present 次数 / 秒 |
 | CPU % | 进程 CPU 占用，**单核 = 100%** | `getrusage` CPU 时间 / 墙钟时间 |
@@ -119,8 +119,8 @@ python3 scripts/diag_report.py target/agents/x --counters --spans          # 诊
 - **gpui-kit 版是精简写法**：行情表用 `uniform_list` + 普通 `div`，没有用 gpui-kit 的 `Table` 等现成组件，也没有主题、悬停态、选择框。用 gpui-kit 现成组件写同样的界面，CPU 会更高。
 - gpui-kit 版每批行情 `cx.notify()` 整个视图，下一帧统一重建可见行；NSH 版按 signal 粒度更新绑定。
 - 为什么固定 NSH `d3655d3` + 补丁：这是实测时的版本。补丁（`patches/`，上游 PR https://github.com/longbridge/nsh/pull/282）修复 NSH Rust 组件累计约 100 万次更新后冻结的缺陷，不打补丁 `nsh-rust` 在 A6 会掉到约 49 fps。NSH 上游 main 之后把 `nsh-ui-mobile` 改名为 `nsh-base`，换版本需要改代码。
-- **渲染引擎都是 gpui-fast，版本不同**：纯 GPUI 版依赖 `gpui-kit =0.8.0` 并打开 `gpui-fast` feature，gpui-kit 此时 `pub use ::gpui_fast::*`，实际渲染用 **gpui-fast 0.1.10**；依赖树里同时编译进的 `gpui-pre 0.3.9` 是 gpui-kit 的非可选依赖，这个 feature 组合下不参与渲染。NSH 三种写法经 `nsh-platform-gpui` 使用 **gpui-fast 0.1.9**。两版帧计时（profiler）接口相同。粗看 0.1.9 → 0.1.10 的源码差异（约 1000 行），主要是输入法处理器的保留重绘判断、热重载、键盘焦点与结构体字段顺序，没有看到绘制热路径的优化，但未做同版本对照。gpui-fast 的优化 NSH 与纯 GPUI 版都享受到，两者的 CPU 差距在 gpui-fast 之上的那一层。
-- **行情场景的 fps 不是吞吐量**：推送固定每 10ms 一批，有变化才重画，所以帧数 ≈ 推送批次（约 100/秒）+ 各写法自己的额外重画。gpui-kit 版每 50ms 检查一次闪烁，只要有行在闪就 `cx.notify()` 整个视图，额外约 20 帧/秒；NSH 版的闪烁由 100ms 一次的时间 signal 推动，多与推送帧重合。因此 r200～r20000 下 GPUI 约 118–120 fps、NSH 约 101–110 fps，是重画触发方式不同，不是 GPUI 画得更快（屏幕 144Hz，`r5000_scroll` 时 NSH 也能到 144）。比较行情负载应看 CPU：同样输入下 GPUI 帧更多、CPU 更低。
+- **渲染引擎都是 gpui-fast，版本不同**：纯 GPUI Fast 版依赖 `gpui-kit =0.8.0` 并打开 `gpui-fast` feature，gpui-kit 此时 `pub use ::gpui_fast::*`，实际渲染用 **gpui-fast 0.1.10**；依赖树里同时编译进的 `gpui-pre 0.3.9` 是 gpui-kit 的非可选依赖，这个 feature 组合下不参与渲染。NSH 三种写法经 `nsh-platform-gpui` 使用 **gpui-fast 0.1.9**。两版帧计时（profiler）接口相同。粗看 0.1.9 → 0.1.10 的源码差异（约 1000 行），主要是输入法处理器的保留重绘判断、热重载、键盘焦点与结构体字段顺序，没有看到绘制热路径的优化，但未做同版本对照。gpui-fast 的优化 NSH 与纯 GPUI Fast 版都享受到，两者的 CPU 差距在 gpui-fast 之上的那一层。
+- **行情场景的 fps 不是吞吐量**：推送固定每 10ms 一批，有变化才重画，所以帧数 ≈ 推送批次（约 100/秒）+ 各写法自己的额外重画。gpui-kit 版每 50ms 检查一次闪烁，只要有行在闪就 `cx.notify()` 整个视图，额外约 20 帧/秒；NSH 版的闪烁由 100ms 一次的时间 signal 推动，多与推送帧重合。因此 r200～r20000 下 GPUI Fast 版约 118–120 fps、NSH 约 101–110 fps，是重画触发方式不同，不是 GPUI Fast 画得更快（屏幕 144Hz，`r5000_scroll` 时 NSH 也能到 144）。比较行情负载应看 CPU：同样输入下 GPUI Fast 版帧更多、CPU 更低。
 - 历史 Apple M4 / macOS 26.5.1 数据见 `results/20261021-combined/`（`REPORT.md` 汇总，`SOURCES.txt` 说明每列来自哪一轮）。Linux 本轮实测及局限见下文。
 
 ## 7. 常见问题
@@ -128,7 +128,7 @@ python3 scripts/diag_report.py target/agents/x --counters --spans          # 诊
 | 现象 | 处理 |
 |---|---|
 | 编译时 rustup 开始下载 iOS / Android target 或升级工具链 | NSH 仓库的 `rust-toolchain.toml` 引起。`setup.sh` 已用 `RUSTUP_TOOLCHAIN=stable` 规避；手动编译 NSH 时也加上它 |
-| 日志里 `no Metal Toolchain` / 首次启动稍慢 | 正常：没装 Xcode Metal 工具链时 GPUI 在启动时编译着色器，不影响测量 |
+| 日志里 `no Metal Toolchain` / 首次启动稍慢 | 正常：没装 Xcode Metal 工具链时 GPUI Fast 在启动时编译着色器，不影响测量 |
 | 某个阶段 fps 异常（如 `idle` 不为 0、滚动远低于刷新率） | 多半是测试期间操作了电脑或窗口被遮挡，重跑该场景：`SCENARIOS=... IMPLS=... scripts/run.sh 1` |
 | 日志出现 `potential infinite loop: an effect keeps changing what it reads` | NSH 补丁没打上：删掉 `vendor/` 重跑 `scripts/setup.sh` |
 | 公司代理导致 git / cargo 下载失败 | 先 `unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy` 再跑 |
@@ -137,7 +137,7 @@ python3 scripts/diag_report.py target/agents/x --counters --spans          # 诊
 
 Intel Core i7-13700KF / Linux 7.2.8 / NVIDIA RTX 3060 Ti，Hyprland 0.56.2，3840×2160 @ 144Hz。NSH 跑在原生 GTK 4 后端，测试窗口浮动 1600×1000；4 种实现 × 4 个场景各一次完整阶段时长。CPU 单核满载为 100%，越低越好；耗时为 p50。
 
-| 指标 | 纯 TSX | TSX + Rust | NSH Rust | 纯 GPUI |
+| 指标 | 纯 TSX | TSX + Rust | NSH Rust | 纯 GPUI Fast |
 |---|---:|---:|---:|---:|
 | 每秒 1000 条行情：CPU | 20.2% | 20.0% | 18.0% | 20.2% |
 | 每秒 2 万条行情：CPU | 77.9% | 78.1% | 73.1% | **25.1%** |
@@ -156,13 +156,13 @@ Intel Core i7-13700KF / Linux 7.2.8 / NVIDIA RTX 3060 Ti，Hyprland 0.56.2，384
 
 结论（证据见分析文档）：
 
-- **有渲染工作的场景纯 GPUI 都更快**：轻负载时 NSH 持平（空闲更低），2 万条/秒时 NSH 约 3 倍 CPU，逐帧动画约 3 倍，切页签、过滤这类整块挂载慢 4–10 倍。fps 不能比较快慢：各写法都受推送节奏（约 100 帧）或屏幕刷新率（144）限制。
-- **原生后端比 NSH-on-GPUI 更费**：引擎线程 67% 的时间在 Pango 测量文本（每次价格变化都要重新排版，平均 1.85 次）；GTK 主线程为每个节点的控件做快照和 GSK 渲染，原生动画 22% 对 GPUI 后端 11%。
-- **NSH 内部，语言只影响 JS 那一段**：NSH Rust 比 TSX 省 4–12 个百分点；布局、文本、渲染三种写法相同。计算放在 Rust（hybrid / NSH Rust）与纯 GPUI 一样快，留在 JS 慢 15–20 倍，跨语言调用每次只有几微秒。
+- **有渲染工作的场景纯 GPUI Fast 都更快**：轻负载时 NSH 持平（空闲更低），2 万条/秒时 NSH 约 3 倍 CPU，逐帧动画约 3 倍，切页签、过滤这类整块挂载慢 4–10 倍。fps 不能比较快慢：各写法都受推送节奏（约 100 帧）或屏幕刷新率（144）限制。
+- **原生后端比 NSH 跑在 GPUI Fast 上（nsh-platform-gpui）更费**：引擎线程 67% 的时间在 Pango 测量文本（每次价格变化都要重新排版，平均 1.85 次）；GTK 主线程为每个节点的控件做快照和 GSK 渲染，原生动画 22% 对 GPUI Fast 后端 11%。
+- **NSH 内部，语言只影响 JS 那一段**：NSH Rust 比 TSX 省 4–12 个百分点；布局、文本、渲染三种写法相同。计算放在 Rust（hybrid / NSH Rust）与纯 GPUI Fast 一样快，留在 JS 慢 15–20 倍，跨语言调用每次只有几微秒。
 - **已验证的局部修复**：样式未改变布局属性时不重新布局（引擎线程 −15%～−34%）；NSH Rust 详情字段改为 `computed`（每次选中 `fields()` 从 80 次降到 1 次，约 7000 次分配降到约 90 次，选中延迟 2.23→1.69ms）。两者都是 A/B 开关，默认未启用。
 - **计时可信度**：提交版本校验显示现有 applied 关联每阶段最多错 0–1 帧；阶段切换最多 7 帧计入下一阶段（fps 影响 <0.5%）。
 
-旧的 Linux 结果 [linux-20261021-192842](results/linux-20261021-192842/REPORT.md) 中 NSH 跑在 GPUI 后端上，且测试窗口很可能被平铺成更小尺寸，只作定性参考。任务清单见 [NSH 性能分析任务清单](docs/PERFORMANCE-ISSUES.md)。
+旧的 Linux 结果 [linux-20261021-192842](results/linux-20261021-192842/REPORT.md) 中 NSH 跑在 GPUI Fast 后端（nsh-platform-gpui）上，且测试窗口很可能被平铺成更小尺寸，只作定性参考。任务清单见 [NSH 性能分析任务清单](docs/PERFORMANCE-ISSUES.md)。
 
 ## 9. 对外发布准备
 
