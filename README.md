@@ -17,13 +17,15 @@ scripts/run.sh 3      # ③ 正式：4 个场景 × 4 种写法 × 3 次，约 5
 
 Linux 已在本仓库的固定依赖版本上编译运行通过；需要可见的桌面会话、GPU 驱动和 GTK 4 开发库（NSH 原生后端，Arch：`gtk4`；Debian/Ubuntu：`libgtk-4-dev`），其他系统开发库按编译器报错补齐。在 Hyprland 下运行脚本会自动加一条运行时窗口规则，让测试窗口浮动并固定 1600×1000（平铺会改变窗口大小和可见行数），`hyprctl reload` 后消失。Linux 内存指标暂不可用。运行脚本支持两种系统，自动记录环境和版本；程序异常退出、超时或缺少结果会报错。
 
+Windows 的准备与运行脚本是 PowerShell 版，另需 PresentMon，见[第 10 节](#10-windows-运行与实测)。
+
 跑完看 `results/<时间>/REPORT.md`（冒烟在 `results/quick-<时间>/`）。
 
 **跑的时候必须：亮屏、不锁屏、外接电源、不操作电脑。** 屏幕上会轮流弹出 1600×1000 的测试窗口，每个跑完自动关闭。窗口被遮挡、失焦或锁屏都会让帧率和 CPU 失真（锁屏时 GPUI Fast 不绘制）。
 
 ## 2. 四种写法
 
-NSH 三种写法默认跑在**本平台的原生后端**上：Linux 是 `nsh-platform-linux`（GTK 4 控件、GSK 绘制、Pango 排版），macOS 是 `nsh-platform-macos`（AppKit、Core Animation、CoreText）。宿主在 `nsh-app/src/native_host.rs`。同样的写法跑在 `nsh-platform-gpui` 上作为对照：`BENCH_BACKEND=gpui`，`run.sh` 里的名字是 `nsh-gpui` / `hybrid-gpui` / `rustui-gpui`，报告列名加 `-gpui`。macOS 原生宿主尚未在 Mac 上实测。
+NSH 三种写法默认跑在**本平台的原生后端**上：Linux 是 `nsh-platform-linux`（GTK 4 控件、GSK 绘制、Pango 排版），macOS 是 `nsh-platform-macos`（AppKit、Core Animation、CoreText），Windows 是 `nsh-platform-windows`（Win32 窗口、Direct2D 绘制、DirectWrite 排版）。宿主在 `nsh-app/src/native_host.rs`。同样的写法跑在 `nsh-platform-gpui` 上作为对照：`BENCH_BACKEND=gpui`，`run.sh` 里的名字是 `nsh-gpui` / `hybrid-gpui` / `rustui-gpui`，报告列名加 `-gpui`。macOS 原生宿主已在 Mac 上实测（[第 9 节](#9-macos-实测)）；macOS 与 Windows 宿主把测试窗口放在刷新率最高的屏幕上。
 
 | `run.sh` 里的名字 | 报告列名 | 写法 | 代码 |
 |---|---|---|---|
@@ -164,7 +166,78 @@ Intel Core i7-13700KF / Linux 7.2.8 / NVIDIA RTX 3060 Ti，Hyprland 0.56.2，384
 
 旧的 Linux 结果 [linux-20261021-192842](results/linux-20261021-192842/REPORT.md) 中 NSH 跑在 GPUI Fast 后端（nsh-platform-gpui）上，且测试窗口很可能被平铺成更小尺寸，只作定性参考。任务清单见 [NSH 性能分析任务清单](docs/PERFORMANCE-ISSUES.md)。
 
-## 9. 对外发布准备
+## 9. macOS 实测
+
+TODO（机型 / 系统 / 屏幕刷新率）。NSH 三种写法跑在原生 AppKit 后端上，帧指标来自 `nsh-002` 补丁的帧钩子：主线程应用一次提交（含 Core Animation 提交）或原生动画的一次逐帧，算一帧。测试窗口放在刷新率最高的屏幕上（接了 60Hz 外接屏作主屏时也用内置 120Hz 屏），超时帧按该屏刷新率判定，结果 JSON 的 `refresh_hz` 记录它。
+
+| 指标 | 纯 TSX | TSX + Rust | NSH Rust | 纯 GPUI Fast |
+|---|---:|---:|---:|---:|
+| 每秒 1000 条行情：CPU | TODO | TODO | TODO | TODO |
+| 每秒 2 万条行情：CPU | TODO | TODO | TODO | TODO |
+| 同阶段推送→上屏 | TODO | TODO | TODO | TODO |
+| 5000 条/秒并滚动：CPU | TODO | TODO | TODO | TODO |
+| 1000 方块逻辑逐帧动画：CPU | TODO | TODO | TODO | TODO |
+| 1000 方块原生动画：CPU | TODO | TODO | TODO | TODO |
+| 选中行→上屏 | TODO | TODO | TODO | TODO |
+| 切换页签→上屏 | TODO | TODO | TODO | TODO |
+| 5 万条过滤→上屏 | TODO | TODO | TODO | TODO |
+| 10 万条排序 | TODO | TODO | TODO | TODO |
+| 峰值内存 | TODO | TODO | TODO | TODO |
+
+完整报告：TODO（`results/<时间>/REPORT.md`）。
+
+## 10. Windows 运行与实测
+
+Windows 10 / 11 x64。NSH 三种写法跑在 `nsh-platform-windows` 上（`patches/nsh-003-windows-diagnostics.patch` 把 `nsh-002` 的诊断计数器、提交版本探针和帧钩子接到这个后端），纯 GPUI Fast 版不变。
+
+准备：
+
+- [Rust](https://rustup.rs)（MSVC 工具链）、Visual Studio C++ 生成工具、git、Python 3（`py` 或 `python`）；
+- [PresentMon](https://github.com/GameTechDev/PresentMon/releases) 2.x 命令行版（`PresentMon-2.x-x64.exe`），记录每一帧何时真正显示到屏幕上；需要管理员权限运行。
+
+```powershell
+# 在仓库根目录，管理员 PowerShell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\setup-windows.ps1          # 准备：同 setup.sh（-Toolchain 可指定 Rust 工具链）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run-windows.ps1 1 -Quick -PresentMon <PresentMon.exe 路径>   # 冒烟
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run-windows.ps1 3 -PresentMon <PresentMon.exe 路径>          # 正式
+```
+
+`SCENARIOS` / `IMPLS` / `BENCH_QUICK` 与 `run.sh` 相同（写法：`rust nsh hybrid rustui`）。结果目录、`metadata.json`、`REPORT.md` 与 macOS / Linux 一致，另有每次运行的 PresentMon 记录 `presentmon/*.csv`。
+
+**跑的时候必须：** 除第 1 节的要求外，测试用户要**在本机控制台登录**并停在桌面上；**不要用远程桌面**连着（远程桌面会换掉显示路径，帧率和刷新率都不再是本机屏幕的），脚本检测到桌面不在控制台会拒绝运行。可以从 SSH 等会话启动：脚本建一个仅在该用户登录时运行的交互式计划任务，在用户桌面上启动测试窗口，结束后删除。运行前会最小化桌面上的其他窗口，测试窗口置顶。
+
+Windows 上的口径：
+
+| 指标 | 怎么算 |
+|---|---|
+| fps / 绘制 / 帧工作量（`nsh-*`） | 每次 `WM_PAINT`（Direct2D 绘制整棵树 + `Present(1)`）算一帧。交换链最大帧延迟为 1，持续出帧时 `Present` 可能等合成器，这段等待计入绘制和帧工作量 |
+| 推送→上屏 / 触发→上屏 | 与其他平台相同；`nsh-*` 有提交版本确认（verified） |
+| 显示 fps / 显示间隔 / 超时显示（PresentMon） | `scripts/presentmon_join.py` 按各阶段起止的 QPC 时刻切分 PresentMon 记录：阶段内真正显示到屏幕的帧数 / 秒数、相邻两次显示的间隔、间隔超过 1.5 个刷新周期的次数。四种写法同一口径 |
+| CPU % | `QueryProcessCycleTime` 的周期数 ÷ 校准出的每秒周期数。不用 `GetProcessTimes`：它按时钟中断（约 15.6ms）采样记账，跟着刷新节奏的短脉冲工作常被记成 0 |
+| 内存 MB | 私有工作集（任务管理器"内存"列同口径） |
+| 各线程 CPU | 暂未实现 |
+
+测试窗口放在刷新率最高的显示器（并列取主显示器），客户区 1600×1000 点（按显示器缩放换算成像素）。
+
+TODO（机型 / 系统 / GPU / 显示器分辨率、刷新率与缩放 / PresentMon 版本）：
+
+| 指标 | 纯 TSX | TSX + Rust | NSH Rust | 纯 GPUI Fast |
+|---|---:|---:|---:|---:|
+| 每秒 1000 条行情：CPU | TODO | TODO | TODO | TODO |
+| 每秒 2 万条行情：CPU | TODO | TODO | TODO | TODO |
+| 同阶段推送→上屏 | TODO | TODO | TODO | TODO |
+| 5000 条/秒并滚动：显示 fps（PresentMon） | TODO | TODO | TODO | TODO |
+| 1000 方块逻辑逐帧动画：CPU | TODO | TODO | TODO | TODO |
+| 1000 方块原生动画：CPU | TODO | TODO | TODO | TODO |
+| 选中行→上屏 | TODO | TODO | TODO | TODO |
+| 切换页签→上屏 | TODO | TODO | TODO | TODO |
+| 5 万条过滤→上屏 | TODO | TODO | TODO | TODO |
+| 10 万条排序 | TODO | TODO | TODO | TODO |
+| 峰值内存 | TODO | TODO | TODO | TODO |
+
+完整报告：TODO（`results/<时间>/REPORT.md`）。
+
+## 11. 对外发布准备
 
 本基准使用生成数据和公开依赖。已清理当前文件中的内部 clone 地址、内部项目名注释和应用 ID；GitHub 仓库已整理为不含这些标识的全新初始提交；内部仓库保留原始历史。模式扫描未发现常见凭证格式，但无法据此确认代码归属或完全排除敏感内容。
 
