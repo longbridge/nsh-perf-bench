@@ -127,7 +127,7 @@ pub fn run(driver: Arc<Driver>, bundle_path: PathBuf, registry: nsh_core::ui::Re
     use std::time::{Duration, Instant};
 
     use nsh_platform_macos::objc2::MainThreadMarker;
-    use nsh_platform_macos::objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSWindow, NSWindowStyleMask};
+    use nsh_platform_macos::objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSScreen, NSWindow, NSWindowStyleMask};
     use nsh_platform_macos::objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
     use nsh_platform_macos::{App, AppOptions, AppView, Bundle, Root};
 
@@ -150,6 +150,21 @@ pub fn run(driver: Arc<Driver>, bundle_path: PathBuf, registry: nsh_core::ui::Re
     let window = unsafe { NSWindow::initWithContentRect_styleMask_backing_defer(mtm.alloc(), rect, style, NSBackingStoreType::Buffered, false) };
     unsafe { window.setReleasedWhenClosed(false) };
     window.setTitle(&NSString::from_str("bench · NSH"));
+    // 先把窗口放到刷新率最高的屏幕，再装视图、加载：NSH 的 display link 在第一次需要逐帧时创建，
+    // 按窗口所在屏定帧率范围（视图还没进窗口时退回有键盘焦点的屏幕），之后只在从暂停恢复时重算。
+    // 窗口默认落在主屏上，主屏是 60Hz 外接屏时内置 120Hz 屏用不上
+    let screens = NSScreen::screens(mtm);
+    for s in screens.iter() {
+        eprintln!("[bench] screen {}Hz frame {:?}", s.maximumFramesPerSecond(), s.frame());
+    }
+    if let Some(screen) = screens.iter().max_by_key(|s| s.maximumFramesPerSecond()) {
+        let (vf, hz) = (screen.visibleFrame(), screen.maximumFramesPerSecond().max(1));
+        let x = vf.origin.x + ((vf.size.width - 1600.0) / 2.0).max(0.0);
+        let y = vf.origin.y + ((vf.size.height - 1000.0) / 2.0).max(0.0);
+        window.setFrame_display(window.frameRectForContentRect(NSRect::new(NSPoint::new(x, y), NSSize::new(1600.0, 1000.0))), true);
+        driver.metrics.set_refresh(Duration::from_secs_f64(1.0 / hz as f64));
+        eprintln!("[bench] window on the {hz}Hz screen");
+    }
     let view = AppView::new(mtm, AppOptions::default());
     window.setContentView(Some(&view.view()));
     if crate::rustui_mode() {
