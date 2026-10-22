@@ -10,8 +10,45 @@ use std::time::{Duration, Instant};
 
 /// 进程起点（启动耗时、时间戳都相对它）
 pub fn origin() -> Instant {
-    static T0: OnceLock<Instant> = OnceLock::new();
-    *T0.get_or_init(Instant::now)
+    origin_pair().0
+}
+
+/// 进程起点，及同一时刻的 QueryPerformanceCounter 读数（仅 Windows）
+fn origin_pair() -> (Instant, Option<i64>) {
+    static T0: OnceLock<(Instant, Option<i64>)> = OnceLock::new();
+    *T0.get_or_init(|| (Instant::now(), qpc_now()))
+}
+
+/// 当前 QPC 读数（仅 Windows）。Windows 上 `Instant` 本身基于 QPC，PresentMon 的 `--qpc_time` 输出同一时钟
+#[cfg(windows)]
+fn qpc_now() -> Option<i64> {
+    let mut v = 0i64;
+    unsafe { windows_sys::Win32::System::Performance::QueryPerformanceCounter(&mut v) };
+    Some(v)
+}
+#[cfg(not(windows))]
+fn qpc_now() -> Option<i64> {
+    None
+}
+
+/// QPC 频率（次 / 秒，仅 Windows）
+#[cfg(windows)]
+fn qpc_freq() -> Option<i64> {
+    let mut v = 0i64;
+    unsafe { windows_sys::Win32::System::Performance::QueryPerformanceFrequency(&mut v) };
+    Some(v)
+}
+#[cfg(not(windows))]
+fn qpc_freq() -> Option<i64> {
+    None
+}
+
+/// 把 `t` 换算成 QPC 读数（相对进程起点推算，仅 Windows）：scripts/presentmon_join.py 据此把帧切到各阶段
+fn instant_to_qpc(t: Instant) -> Option<i64> {
+    let (o, oq) = origin_pair();
+    let (oq, f) = (oq?, qpc_freq()? as f64);
+    let d = if t >= o { (t - o).as_secs_f64() } else { -(o - t).as_secs_f64() };
+    Some(oq + (d * f).round() as i64)
 }
 
 // ---------------------------------------------------------------------------
@@ -326,9 +363,10 @@ impl Driver {
                 }
                 metrics.end_phase();
             }
-            dd.done.store(true, Ordering::Relaxed);
+            // 先写报告再置 done：宿主看到 done 即可退出
             let path = metrics.write_report();
             eprintln!("[bench] report: {path}");
+            dd.done.store(true, Ordering::Relaxed);
         });
         d
     }
@@ -342,6 +380,7 @@ impl Driver {
 struct PhaseAcc {
     phase: Option<Phase>,
     started: Option<Instant>,
+    qpc_start: Option<i64>,
     cpu_start: f64,
     draws: Vec<f64>,
     dirty_to_draw_end: Vec<f64>,
@@ -422,6 +461,11 @@ pub struct PhaseReport {
     pub spans_ms: Vec<SpanReport>,
     /// 帧关联诊断
     pub frame_link: FrameLink,
+    /// 阶段起止的 QPC 读数（仅 Windows）：scripts/presentmon_join.py 按它把 PresentMon 的帧切到各阶段
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qpc_start: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qpc_end: Option<i64>,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -460,7 +504,21 @@ pub struct Report {
     pub scenario: String,
     pub startup_first_frame_ms: f64,
     pub peak_footprint_mb: f64,
+    /// 宿主报告的屏幕刷新率（超时帧按它的周期判定）；没报告时省略，按 60Hz 判定
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_hz: Option<f64>,
+    /// 进程号与 QPC 频率 / 起点（仅 Windows）：PresentMon 按进程过滤、对时
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qpc: Option<Qpc>,
     pub phases: Vec<PhaseReport>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct Qpc {
+    pub freq: i64,
+    pub origin: i64,
 }
 
 pub struct Metrics {
@@ -475,6 +533,7 @@ pub struct Metrics {
     done: Mutex<Vec<PhaseReport>>,
     peak_fp: AtomicU64,
     late_budget_us: AtomicU32,
+    refresh_set: AtomicBool,
 }
 
 /// 每个线程的（线程名, CPU 秒），读 /proc/self/task/*/stat；非 Linux 返回空
@@ -528,6 +587,8 @@ pub fn thread_minflt() -> u64 {
     0
 }
 
+/// 进程累计 CPU 时间（秒，用户态 + 内核态）
+#[cfg(unix)]
 pub fn cpu_seconds() -> f64 {
     unsafe {
         let mut ru: libc::rusage = std::mem::zeroed();
@@ -537,7 +598,62 @@ pub fn cpu_seconds() -> f64 {
     }
 }
 
+/// 进程累计 CPU 时间（秒）：QueryProcessCycleTime 的周期数 ÷ 每 CPU 秒的周期数。
+/// 不用 GetProcessTimes：它按时钟中断（约 15.6ms）采样记账，跟着刷新节奏的短脉冲工作
+/// 常在两次中断之间做完，被少算甚至记成 0（实测每秒 1000 条行情时读数约为 0%）
+#[cfg(windows)]
+pub fn cpu_seconds() -> f64 {
+    use windows_sys::Win32::System::{Threading::GetCurrentProcess, WindowsProgramming::QueryProcessCycleTime};
+    let mut cycles = 0u64;
+    if unsafe { QueryProcessCycleTime(GetCurrentProcess(), &mut cycles) } == 0 {
+        return 0.0;
+    }
+    cycles as f64 / cycles_per_cpu_second()
+}
+
+/// 每 CPU 秒的周期数：一个线程忙等 200ms，用它的 QueryThreadCycleTime 增量除以墙钟时间
+/// （忙等线程这段时间一直在跑，周期增量 ≈ 时间 × 计数频率）。只校准一次
+#[cfg(windows)]
+fn cycles_per_cpu_second() -> f64 {
+    static HZ: OnceLock<f64> = OnceLock::new();
+    *HZ.get_or_init(|| {
+        thread::spawn(|| {
+            use windows_sys::Win32::System::{Threading::GetCurrentThread, WindowsProgramming::QueryThreadCycleTime};
+            let read = || {
+                let mut c = 0u64;
+                unsafe { QueryThreadCycleTime(GetCurrentThread(), &mut c) };
+                c
+            };
+            let (c0, t0) = (read(), Instant::now());
+            while t0.elapsed() < Duration::from_millis(200) {
+                std::hint::spin_loop();
+            }
+            (read() - c0) as f64 / t0.elapsed().as_secs_f64()
+        })
+        .join()
+        .unwrap_or(3.0e9)
+    })
+}
+
+/// Windows 进程内存（MB）：私有工作集（PROCESS_MEMORY_COUNTERS_EX2.PrivateWorkingSetSize），
+/// 与任务管理器「内存」列同口径；系统不支持 EX2 时退回私有提交（PrivateUsage）
+#[cfg(windows)]
+pub fn footprint_mb() -> f64 {
+    use windows_sys::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX2};
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
+    unsafe {
+        let mut c: PROCESS_MEMORY_COUNTERS_EX2 = std::mem::zeroed();
+        c.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX2>() as u32;
+        if GetProcessMemoryInfo(GetCurrentProcess(), &mut c as *mut _ as *mut PROCESS_MEMORY_COUNTERS, c.cb) == 0 {
+            return 0.0;
+        }
+        let b = if c.PrivateWorkingSetSize > 0 { c.PrivateWorkingSetSize } else { c.PrivateUsage };
+        b as f64 / 1048576.0
+    }
+}
+
 /// macOS phys_footprint（MB），与活动监视器「内存」一致
+#[cfg(not(windows))]
 pub fn footprint_mb() -> f64 {
     #[cfg(target_os = "macos")]
     unsafe {
@@ -567,6 +683,7 @@ impl Metrics {
             done: Mutex::new(Vec::new()),
             peak_fp: AtomicU64::new(0),
             late_budget_us: AtomicU32::new(16_667),
+            refresh_set: AtomicBool::new(false),
         }
     }
 
@@ -576,9 +693,11 @@ impl Metrics {
         let mut q = self.applied.lock().unwrap();
         let dropped_at_begin = q.len() as u64;
         q.clear();
+        let now = Instant::now();
         *a = PhaseAcc {
             phase: Some(p),
-            started: Some(Instant::now()),
+            started: Some(now),
+            qpc_start: instant_to_qpc(now),
             cpu_start: cpu_seconds(),
             threads_start: thread_cpu_seconds(),
             counters_start,
@@ -590,7 +709,8 @@ impl Metrics {
     fn end_phase(&self) {
         let mut a = std::mem::take(&mut *self.acc.lock().unwrap());
         let Some(p) = a.phase.take() else { return };
-        let secs = a.started.map(|s| s.elapsed().as_secs_f64()).unwrap_or(1.0);
+        let ended = Instant::now();
+        let secs = a.started.map(|s| (ended - s).as_secs_f64()).unwrap_or(1.0);
         let fp = footprint_mb();
         self.peak_fp.fetch_max((fp * 1000.0) as u64, Ordering::Relaxed);
         let counters: Vec<(String, u64)> = match self.counters.get() {
@@ -652,6 +772,8 @@ impl Metrics {
             counters,
             spans_ms,
             frame_link,
+            qpc_start: a.qpc_start,
+            qpc_end: a.qpc_start.and(instant_to_qpc(ended)),
         };
         for (k, p) in &r.compute_ms {
             eprintln!("[bench]   compute {k:>16} n {:>4} p50 {:>8.2} ms p95 {:>8.2} ms", p.n, p.p50, p.p95);
@@ -730,6 +852,7 @@ impl Metrics {
 
     pub fn set_refresh(&self, interval: Duration) {
         self.late_budget_us.store(interval.as_micros() as u32, Ordering::Relaxed);
+        self.refresh_set.store(true, Ordering::Relaxed);
     }
 
     /// 一帧绘制完成：draw_start/draw_end；work_start 为 GPUI FrameTiming::work_start()
@@ -800,13 +923,24 @@ impl Metrics {
             scenario: scenario(),
             startup_first_frame_ms: self.first_present_ns.load(Ordering::Relaxed) as f64 / 1e6,
             peak_footprint_mb: self.peak_fp.load(Ordering::Relaxed) as f64 / 1000.0,
+            refresh_hz: self
+                .refresh_set
+                .load(Ordering::Relaxed)
+                .then(|| (1e7 / self.late_budget_us.load(Ordering::Relaxed).max(1) as f64).round() / 10.0),
+            pid: cfg!(windows).then(std::process::id),
+            qpc: qpc_freq().zip(origin_pair().1).map(|(freq, origin)| Qpc { freq, origin }),
             phases: self.done.lock().unwrap().clone(),
         };
         let dir = std::env::var("BENCH_OUT").unwrap_or_else(|_| "results".into());
         let _ = std::fs::create_dir_all(&dir);
         let path = format!("{dir}/{}-{}.json", self.name, scenario());
         let _ = std::fs::write(&path, serde_json::to_string_pretty(&r).unwrap());
-        eprintln!("[bench] startup first frame {:.1} ms, peak footprint {:.1} MB", r.startup_first_frame_ms, r.peak_footprint_mb);
+        eprintln!(
+            "[bench] startup first frame {:.1} ms, peak footprint {:.1} MB, refresh {}",
+            r.startup_first_frame_ms,
+            r.peak_footprint_mb,
+            r.refresh_hz.map_or("unknown".into(), |hz| format!("{hz} Hz"))
+        );
         path
     }
 }
@@ -1028,5 +1162,25 @@ mod tests {
         m.begin_phase(ph("next", 1, 0, false, "idle", 0));
         assert_eq!(m.acc.lock().unwrap().dropped_at_begin, 2);
         assert!(m.applied.lock().unwrap().is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_cpu_memory_and_qpc() {
+        // 忙等 100ms：周期计数的 CPU 时间应接近墙钟时间（按时钟中断记账的 GetProcessTimes 可能少算）
+        let (c0, t0) = (cpu_seconds(), Instant::now());
+        while t0.elapsed() < Duration::from_millis(100) {
+            std::hint::spin_loop();
+        }
+        let busy = cpu_seconds() - c0;
+        assert!(busy > 0.07 && busy < 0.3, "{busy}");
+        assert!(footprint_mb() > 0.0);
+        let m = Metrics::new("t");
+        m.begin_phase(ph("p", 1, 0, false, "idle", 0));
+        thread::sleep(Duration::from_millis(20));
+        m.end_phase();
+        let r = m.done.lock().unwrap()[0].clone();
+        let (a, b, f) = (r.qpc_start.unwrap(), r.qpc_end.unwrap(), qpc_freq().unwrap() as f64);
+        assert!(((b - a) as f64 / f - r.secs).abs() < 0.005);
     }
 }
