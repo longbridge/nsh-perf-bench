@@ -219,23 +219,29 @@ Windows 上的口径：
 
 测试窗口放在刷新率最高的显示器（并列取主显示器），客户区 1600×1000 点（按显示器缩放换算成像素）。
 
-TODO（机型 / 系统 / GPU / 显示器分辨率、刷新率与缩放 / PresentMon 版本）：
+Intel Core i7-11800H / Windows 11 Pro / NVIDIA RTX 3050 Laptop + Intel UHD，测试窗口在 3840×2160 @ 60Hz、缩放 150% 的显示器上；PresentMon 2.6.0。4 种实现 × 4 个场景各 3 次完整阶段时长，取中位数。CPU 单核满载为 100%，越低越好；耗时为 p50。
 
 | 指标 | 纯 TSX | TSX + Rust | NSH Rust | 纯 GPUI Fast |
 |---|---:|---:|---:|---:|
-| 每秒 1000 条行情：CPU | TODO | TODO | TODO | TODO |
-| 每秒 2 万条行情：CPU | TODO | TODO | TODO | TODO |
-| 同阶段推送→上屏 | TODO | TODO | TODO | TODO |
-| 5000 条/秒并滚动：显示 fps（PresentMon） | TODO | TODO | TODO | TODO |
-| 1000 方块逻辑逐帧动画：CPU | TODO | TODO | TODO | TODO |
-| 1000 方块原生动画：CPU | TODO | TODO | TODO | TODO |
-| 选中行→上屏 | TODO | TODO | TODO | TODO |
-| 切换页签→上屏 | TODO | TODO | TODO | TODO |
-| 5 万条过滤→上屏 | TODO | TODO | TODO | TODO |
-| 10 万条排序 | TODO | TODO | TODO | TODO |
-| 峰值内存 | TODO | TODO | TODO | TODO |
+| 每秒 1000 条行情：CPU | 52.8% | 52.3% | 43.0% | **24.4%** |
+| 每秒 2 万条行情：CPU | 120.1% | 131.7% | 141.3% | **33.0%** |
+| 每秒 2 万条行情：显示 fps（PresentMon） | 27.6 | 32.3 | 60.0 | 60.0 |
+| 同阶段推送→上屏 | 62.4 ms | 54.3 ms | 29.0 ms | **13.2 ms** |
+| 5000 条/秒并滚动：显示 fps（PresentMon） | 60.0 | 60.0 | 60.0 | 60.0 |
+| 1000 方块逻辑逐帧动画：CPU / 显示 fps | 104.5% / 0.9 | 102.4% / 0.8 | 104.6% / 0.9 | **15.1% / 59.6** |
+| 1000 方块原生动画：CPU / 显示 fps | 112.5% / 1.5 | 111.0% / 1.4 | 111.2% / 1.7 | **17.4% / 60.0** |
+| 选中行→上屏 | 5.8 ms | 5.8 ms | 6.0 ms | 10.5 ms |
+| 切换页签→上屏 | 39.0 ms | 38.7 ms | 29.5 ms | **13.4 ms** |
+| 5 万条过滤→上屏 | 25.9 ms | 17.1 ms | 15.4 ms | **10.7 ms** |
+| 10 万条排序 | 108.6 ms | 5.1 ms | 4.9 ms | 5.1 ms |
+| 启动到首次显示（PresentMon，行情场景） | 211 ms | 217 ms | 209 ms | 13747 ms |
+| 峰值内存（行情场景） | 69.9 MB | 77.3 MB | **50.2 MB** | 72.7 MB |
 
-完整报告：TODO（`results/<时间>/REPORT.md`）。
+- 动画场景 `nsh-*` 只有 1–2 fps：`nsh-platform-windows` 给每个 `opacity < 1` 的 view 推一个 `contentBounds` 无界的 Direct2D layer，每个小方块都要清空并混合一张窗口大小的离屏表面，内存同时涨到约 250–270 MB。限定 layer 范围后同一场景回到 60 fps，修复准备提交给 NSH。
+- 持续推送下 `nsh-*` 的推送→上屏约 25 ms（每秒 200 条起即如此），纯 GPUI Fast 约 11 ms；`nsh-*` 的帧计时含 `Present(1)` 的等待，见上表口径。
+- 纯 GPUI Fast 首次显示慢（3.6–18.9 s）是启动时编译着色器；`nsh-*` 约 0.2 s。
+
+完整报告：[results/20261022-211106/REPORT.md](results/20261022-211106/REPORT.md)。
 
 ## 11. 对外发布准备
 
