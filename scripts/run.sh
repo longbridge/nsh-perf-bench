@@ -40,7 +40,7 @@ out, count, scenarios, impls = sys.argv[1:]
 def command(*args):
     p = subprocess.run(args, text=True, capture_output=True)
     return p.stdout.strip() if p.returncode == 0 else 'unavailable'
-files = ['Cargo.lock', 'nsh-app/Cargo.lock', 'patches/nsh-001-reset-runaway-count.patch', 'patches/nsh-002-perf-diagnostics.patch']
+files = ['Cargo.lock', 'nsh-app/Cargo.lock', 'patches/nsh-001-reset-runaway-count.patch', 'patches/nsh-002-perf-diagnostics.patch', 'patches/nsh-003-windows-diagnostics.patch']
 if 'rust' in impls.split(): files.append('target/release/bench-rust')
 if set(impls.split()) - {'rust'}: files.append('target-nsh/release/bench-nsh')
 if set(impls.split()) & {'nsh', 'hybrid', 'nsh-gpui', 'hybrid-gpui'}: files.append('nsh-app/out/app/bundle.nshc')
