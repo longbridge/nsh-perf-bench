@@ -1,0 +1,51 @@
+diff --git a/crates/nsh-platform-windows/src/surface.rs b/crates/nsh-platform-windows/src/surface.rs
+index bd34dbc..a24bf30 100644
+--- a/crates/nsh-platform-windows/src/surface.rs
++++ b/crates/nsh-platform-windows/src/surface.rs
+@@ -396,8 +396,12 @@ impl Surface {
+ 
+     /// Draws the window (`WM_PAINT`).
+     pub(crate) fn paint(self: &Rc<Self>) {
++        let diag_start = std::time::Instant::now();
+         self.invalid.set(false);
+         crate::render::frame(self);
++        nsh_core::diag::add(nsh_core::diag::C::ui_paints, 1);
++        nsh_core::diag::since(nsh_core::diag::C::ui_paint_ns, diag_start);
++        nsh_core::diag::frame(diag_start, std::time::Instant::now());
+     }
+ 
+     /// Hosted items drawn by the frame just shown, with their window
+@@ -472,6 +476,8 @@ impl Surface {
+ 
+     /// Applies what the engine sent (`WM_NSH_WAKE`).
+     pub(crate) fn drain(self: &Rc<Self>) {
++        let _span = nsh_core::diag::Span::new(nsh_core::diag::C::ui_drain_ns);
++        nsh_core::diag::add(nsh_core::diag::C::ui_drains, 1);
+         self.pending.borrow().store(false, Ordering::Release);
+         let messages: Vec<Message> = match &*self.rx.borrow() {
+             Some(rx) => rx.try_iter().collect(),
+@@ -483,6 +489,8 @@ impl Surface {
+                 Message::Batch(batch) => {
+                     self.apply(&batch);
+                     applied = true;
++                    nsh_core::diag::add(nsh_core::diag::C::ui_batches, 1);
++                    nsh_core::diag::ui_applied(nsh_core::diag::get(nsh_core::diag::C::ui_batches), std::time::Instant::now());
+                 }
+                 Message::Error(message) => {
+                     log::error!("{message}");
+@@ -507,6 +515,7 @@ impl Surface {
+     fn apply(self: &Rc<Self>, batch: &MountBatch) {
+         crate::access::prepare(batch);
+         for item in &batch.items {
++            nsh_core::diag::count_item(item);
+             self.anim.borrow_mut().apply(item);
+             if !matches!(
+                 item,
+@@ -559,6 +568,7 @@ impl Surface {
+ 
+     /// One frame of the ticker (`WM_NSH_TICK`).
+     pub(crate) fn tick(self: &Rc<Self>) {
++        let _span = nsh_core::diag::Span::new(nsh_core::diag::C::ui_tick_ns);
+         let now = self.clock();
+         self.now.set(now);
+         if self.anim.borrow().animating() {

@@ -1,0 +1,35 @@
+{
+  "platform": "Windows-10-10.0.22631-SP0",
+  "system": "Windows",
+  "memory_supported": true,
+  "repetitions": 3,
+  "scenarios": [
+    "quotes",
+    "animation",
+    "interaction",
+    "compute"
+  ],
+  "implementations": [
+    "rust",
+    "nsh",
+    "hybrid",
+    "rustui"
+  ],
+  "quick": false,
+  "nsh_backend": "native",
+  "source_commit": "6f25bf452bf90799fb386cd583b3bed11771fd28",
+  "source_dirty": true,
+  "nsh_commit": "d3655d32bff5c4b1346ea04f1e0d9fbde127e1cf",
+  "rustc": "rustc 1.68.2 (9eb3afe9e 2023-03-27)",
+  "cargo": "cargo 1.68.2 (6feb7c9cf 2023-03-26)",
+  "sha256": {
+    "Cargo.lock": "da0bc2c3905f2f3ab0fe27d5b2bfa6c34577f4f2feb6d798a91464d00e842ccb",
+    "nsh-app/Cargo.lock": "9d2368970d7bda49ef0b1256902abadd11700dd61f85635d62a4bdd31299fc77",
+    "patches/nsh-001-reset-runaway-count.patch": "f1be28ced920168012237b9bfe6f8cc664ca8346d95f4255023ef4030227c605",
+    "patches/nsh-002-perf-diagnostics.patch": "92f22a1558d49dd18fe51f48e05d6adc05b5aa0f52e881244eb974e25a1e663e",
+    "patches/nsh-003-windows-diagnostics.patch": "36a740549ed8ae7c8e174aee3f311ed66d7a14efd4f52853d04df7abc30b5674",
+    "target/release/bench-rust.exe": "806dfa0f41c605597e022370daec6685abb017dd78732751dec818b1253227a3",
+    "target-nsh/release/bench-nsh.exe": "50d3f16b94fbcbcad8b37d139e0fed4bfa42db68f1ffbdbb72eb2ecfa3f79359",
+    "nsh-app/out/app/bundle.nshc": "bd52f6256d26d4ad9c5719c926db98dcb9e668900b3c8cbed7e6495bfcf57e0c"
+  }
+}

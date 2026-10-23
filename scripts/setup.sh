@@ -9,9 +9,13 @@ if [ ! -d vendor/nsh/.git ]; then
 fi
 git -C vendor/nsh fetch -q origin
 git -C vendor/nsh checkout -q -f "$NSH_REV"
+# 补丁新增的文件（nsh-core/src/diag.rs）不随 checkout 还原，先清掉，重跑时补丁才能再打上
+git -C vendor/nsh clean -fdq
 git -C vendor/nsh apply "$PWD/patches/nsh-001-reset-runaway-count.patch"
 # 诊断计数器、提交版本探针与 A/B 开关（宿主代码依赖其中的 nsh_core::diag；开关默认关闭，行为同上）
 git -C vendor/nsh apply "$PWD/patches/nsh-002-perf-diagnostics.patch"
+# 同样的诊断接到 Windows 原生后端（nsh-platform-windows；非 Windows 上不参与编译）
+git -C vendor/nsh apply "$PWD/patches/nsh-003-windows-diagnostics.patch"
 # NSH 仓库的 rust-toolchain.toml 会触发 rustup 升级并装移动端 target，这里固定用本机 stable
 export RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN:-stable}
 cargo build --release --manifest-path vendor/nsh/Cargo.toml -p nsh-cli

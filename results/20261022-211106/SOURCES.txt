@@ -1,0 +1,6 @@
+Run: Windows 11 Pro 23H2 / Intel Core i7-11800H / NVIDIA RTX 3050 Laptop + Intel UHD; test window on the 3840x2160 @ 60 Hz display at 150% scale; 4 scenarios x 4 implementations, 3 runs each, full phase lengths, interleaved.
+Command: scripts\run-windows.ps1 3 -PresentMon <path> (PresentMon 2.6.0), started over SSH; test windows ran on the console session through the script's interactive scheduled task. No remote desktop session was connected.
+Source: branch windows-native-backend at 8076605, copied to the Windows machine as a working tree (metadata.json shows source_commit 6f25bf4 + uncommitted changes: the copy's git index was not updated; the files are those of 8076605).
+Toolchain: the binaries were built with rustc 1.98.0 (88d9e12ae, verified from the rustc commit embedded in bench-nsh.exe). metadata.json's rustc/cargo lines show the machine's default toolchain (1.68.2), which run-windows.ps1 queried without the build's toolchain override.
+NSH: d3655d32bff5c4b1346ea04f1e0d9fbde127e1cf + patches nsh-001, nsh-002 (A/B switches off), nsh-003.
+Not included: per-run PresentMon CSVs (presentmon/, 16 MB) and run logs; their per-phase results are already joined into the run JSON files.

@@ -1,0 +1,440 @@
+{
+  "implementation": "rust-gpui",
+  "scenario": "interaction",
+  "startup_first_frame_ms": 260.5464,
+  "peak_footprint_mb": 62.117,
+  "refresh_hz": 60.0,
+  "pid": 146260,
+  "qpc": {
+    "freq": 10000000,
+    "origin": 36303942673811
+  },
+  "phases": [
+    {
+      "name": "warmup",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.2011455,
+      "fps": 0.0,
+      "draw_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "dirty_to_draw_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 7.6949133478259695,
+      "footprint_mb": 48.5078125,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": [],
+      "frame_link": {
+        "probe": false,
+        "verified_ms": null,
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 0,
+        "dropped_at_begin": 0,
+        "pending_at_end": 0
+      },
+      "qpc_start": 36303945844224,
+      "qpc_end": 36303977855679,
+      "presentmon": {
+        "displayed_fps": 0.0,
+        "display_interval_ms": {
+          "n": 0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "p99": 0.0,
+          "max": 0.0
+        },
+        "late_displays": 0,
+        "presents_per_s": 0.0,
+        "dropped": 0
+      }
+    },
+    {
+      "name": "select_row",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.0006081,
+      "fps": 4.899702049118393,
+      "draw_ms": {
+        "n": 49,
+        "p50": 2.4322,
+        "p95": 2.9547000000000003,
+        "p99": 4.001399999999999,
+        "max": 4.001399999999999
+      },
+      "dirty_to_draw_ms": {
+        "n": 49,
+        "p50": 2.5255,
+        "p95": 3.0679000000000003,
+        "p99": 4.100300000000001,
+        "max": 4.100300000000001
+      },
+      "tick_to_frame_ms": {
+        "n": 49,
+        "p50": 10.9996,
+        "p95": 18.6501,
+        "p99": 19.421899999999997,
+        "max": 19.421899999999997
+      },
+      "late_frames": 0,
+      "cpu_pct": 3.111132265477249,
+      "footprint_mb": 53.0390625,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 49,
+      "compute_ms": [],
+      "frame_link": {
+        "probe": false,
+        "verified_ms": {
+          "n": 49,
+          "p50": 10.9996,
+          "p95": 18.6501,
+          "p99": 19.421899999999997,
+          "max": 19.421899999999997
+        },
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 0,
+        "dropped_at_begin": 0,
+        "pending_at_end": 0
+      },
+      "qpc_start": 36303978762052,
+      "qpc_end": 36304078768133,
+      "presentmon": {
+        "displayed_fps": 4.899702049118393,
+        "display_interval_ms": {
+          "n": 48,
+          "p50": 200.0551,
+          "p95": 216.74550000000002,
+          "p99": 233.2774,
+          "max": 233.2774
+        },
+        "late_displays": 48,
+        "presents_per_s": 4.899702049118393,
+        "dropped": 0
+      }
+    },
+    {
+      "name": "switch_tab",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.0006047,
+      "fps": 2.4998488341409995,
+      "draw_ms": {
+        "n": 25,
+        "p50": 2.8077,
+        "p95": 6.9984,
+        "p99": 11.3431,
+        "max": 11.3431
+      },
+      "dirty_to_draw_ms": {
+        "n": 25,
+        "p50": 2.8421000000000003,
+        "p95": 7.085,
+        "p99": 11.394400000000001,
+        "max": 11.394400000000001
+      },
+      "tick_to_frame_ms": {
+        "n": 24,
+        "p50": 13.4957,
+        "p95": 20.6173,
+        "p99": 28.279700000000002,
+        "max": 28.279700000000002
+      },
+      "late_frames": 0,
+      "cpu_pct": 2.7344961706561604,
+      "footprint_mb": 58.03125,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 24,
+      "compute_ms": [],
+      "spans_ms": [
+        {
+          "name": "lat.to_detail",
+          "n": 12,
+          "p50": 11.312600000000002,
+          "p95": 16.772,
+          "max": 17.9088,
+          "sum": 115.8283
+        },
+        {
+          "name": "lat.to_list",
+          "n": 12,
+          "p50": 15.971699999999998,
+          "p95": 20.6173,
+          "max": 28.279700000000002,
+          "sum": 192.4519
+        }
+      ],
+      "frame_link": {
+        "probe": false,
+        "verified_ms": {
+          "n": 24,
+          "p50": 13.4957,
+          "p95": 20.6173,
+          "p99": 28.279700000000002,
+          "max": 28.279700000000002
+        },
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 1,
+        "stale_presents": 0,
+        "dropped_at_begin": 1,
+        "pending_at_end": 0
+      },
+      "qpc_start": 36304079619682,
+      "qpc_end": 36304179625729,
+      "presentmon": {
+        "displayed_fps": 2.4998488341409995,
+        "display_interval_ms": {
+          "n": 25,
+          "p50": 416.65459999999996,
+          "p95": 416.73130000000003,
+          "p99": 433.35069999999996,
+          "max": 433.35069999999996
+        },
+        "late_displays": 25,
+        "presents_per_s": 2.3998548807753592,
+        "dropped": 0
+      }
+    },
+    {
+      "name": "filter_50k",
+      "rate": 0,
+      "scroll": false,
+      "secs": 10.0004696,
+      "fps": 3.999812168820552,
+      "draw_ms": {
+        "n": 40,
+        "p50": 1.5927,
+        "p95": 2.6345,
+        "p99": 4.1127,
+        "max": 4.1127
+      },
+      "dirty_to_draw_ms": {
+        "n": 40,
+        "p50": 1.6933,
+        "p95": 2.7085,
+        "p99": 4.1744,
+        "max": 4.1744
+      },
+      "tick_to_frame_ms": {
+        "n": 40,
+        "p50": 11.025699999999999,
+        "p95": 17.5803,
+        "p99": 18.13,
+        "max": 18.13
+      },
+      "late_frames": 0,
+      "cpu_pct": 2.9985207553225934,
+      "footprint_mb": 58.6171875,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 40,
+      "compute_ms": [],
+      "frame_link": {
+        "probe": false,
+        "verified_ms": {
+          "n": 40,
+          "p50": 11.025699999999999,
+          "p95": 17.5803,
+          "p99": 18.13,
+          "max": 18.13
+        },
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 0,
+        "dropped_at_begin": 0,
+        "pending_at_end": 0
+      },
+      "qpc_start": 36304180487468,
+      "qpc_end": 36304280492164,
+      "presentmon": {
+        "displayed_fps": 3.999812168820552,
+        "display_interval_ms": {
+          "n": 40,
+          "p50": 250.0075,
+          "p95": 266.728,
+          "p99": 266.8147,
+          "max": 266.8147
+        },
+        "late_displays": 40,
+        "presents_per_s": 3.999812168820552,
+        "dropped": 0
+      }
+    },
+    {
+      "name": "select_under_load",
+      "rate": 1000,
+      "scroll": false,
+      "secs": 10.0004653,
+      "fps": 59.597226941030435,
+      "draw_ms": {
+        "n": 596,
+        "p50": 2.2778,
+        "p95": 2.6959000000000004,
+        "p99": 2.9587,
+        "max": 3.4644
+      },
+      "dirty_to_draw_ms": {
+        "n": 596,
+        "p50": 2.3779,
+        "p95": 2.8491,
+        "p99": 3.0695,
+        "max": 3.7249000000000003
+      },
+      "tick_to_frame_ms": {
+        "n": 1041,
+        "p50": 11.5754,
+        "p95": 18.4954,
+        "p99": 18.9159,
+        "max": 19.3762
+      },
+      "late_frames": 0,
+      "cpu_pct": 18.90825672227497,
+      "footprint_mb": 59.109375,
+      "emitted_batches": 1000,
+      "applied_batches": 1000,
+      "emitted_rows": 10000,
+      "triggers": 48,
+      "compute_ms": [],
+      "frame_link": {
+        "probe": false,
+        "verified_ms": {
+          "n": 1041,
+          "p50": 11.5754,
+          "p95": 18.4954,
+          "p99": 18.9159,
+          "max": 19.3762
+        },
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 0,
+        "stale_presents": 0,
+        "dropped_at_begin": 0,
+        "pending_at_end": 7
+      },
+      "qpc_start": 36304280971121,
+      "qpc_end": 36304380975774,
+      "presentmon": {
+        "displayed_fps": 58.597273468865495,
+        "display_interval_ms": {
+          "n": 586,
+          "p50": 16.666400000000003,
+          "p95": 16.7466,
+          "p99": 33.3503,
+          "max": 116.696
+        },
+        "late_displays": 13,
+        "presents_per_s": 59.99720832989641,
+        "dropped": 12
+      }
+    },
+    {
+      "name": "cooldown",
+      "rate": 0,
+      "scroll": false,
+      "secs": 3.0002461,
+      "fps": 4.999589866977912,
+      "draw_ms": {
+        "n": 15,
+        "p50": 2.5617,
+        "p95": 3.0917000000000003,
+        "p99": 3.9553000000000003,
+        "max": 3.9553000000000003
+      },
+      "dirty_to_draw_ms": {
+        "n": 15,
+        "p50": 2.6399000000000004,
+        "p95": 3.1580000000000004,
+        "p99": 4.1474,
+        "max": 4.1474
+      },
+      "tick_to_frame_ms": {
+        "n": 0,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "max": 0.0
+      },
+      "late_frames": 0,
+      "cpu_pct": 2.781638071630343,
+      "footprint_mb": 62.1171875,
+      "emitted_batches": 0,
+      "applied_batches": 0,
+      "emitted_rows": 0,
+      "triggers": 0,
+      "compute_ms": [],
+      "frame_link": {
+        "probe": false,
+        "verified_ms": null,
+        "early": 0,
+        "early_gap_ms": null,
+        "stale_draws": 4,
+        "stale_presents": 4,
+        "dropped_at_begin": 7,
+        "pending_at_end": 0
+      },
+      "qpc_start": 36304381008735,
+      "qpc_end": 36304411011196,
+      "presentmon": {
+        "displayed_fps": 3.9996718935823297,
+        "display_interval_ms": {
+          "n": 12,
+          "p50": 66.6652,
+          "p95": 66.6842,
+          "p99": 66.7067,
+          "max": 66.7067
+        },
+        "late_displays": 9,
+        "presents_per_s": 3.333059911318608,
+        "dropped": 0
+      }
+    }
+  ],
+  "presentmon": {
+    "joined": true,
+    "csv": "run1-interaction-rust.csv",
+    "presents": 724,
+    "displayed": 712,
+    "refresh_hz": 60.0,
+    "late_threshold_ms": 25.0,
+    "present_modes": {
+      "Composed: Flip": 724
+    },
+    "startup_first_present_ms": 3629.6759,
+    "startup_first_display_ms": 3657.7421,
+    "display_column": "MsUntilDisplayed",
+    "rows_total": 724,
+    "processes": [
+      "bench-rust.exe:146260=724"
+    ]
+  }
+}

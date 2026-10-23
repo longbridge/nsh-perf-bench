@@ -6,10 +6,12 @@ out = str(Path(sys.argv[1]))
 meta_path = Path(out, "metadata.json")
 meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
 env_path = Path(out, "env.txt")
-linux = env_path.exists() and "Linux" in env_path.read_text()
+env_text = env_path.read_text(encoding="utf-8", errors="replace") if env_path.exists() else ""
+linux = "Linux" in env_text
+windows = meta.get("system") == "Windows" or "Windows" in env_text
 memory_supported = meta.get("memory_supported", not linux)
 data = {}  # scenario -> impl -> [report]
-files = sorted(glob.glob(f"{out}/run*/*.json"))
+files = sorted(str(Path(f)) for f in glob.glob(f"{out}/run*/*.json"))
 if not files:
     sys.exit("no raw JSON results; cannot build a report")
 NAMES = {"rust": "rust-gpui", "nsh": "nsh-tsx", "hybrid": "nsh-hybrid", "rustui": "nsh-rust",
@@ -21,7 +23,7 @@ if "repetitions" in meta:
     if set(files) != expected:
         sys.exit("result files do not match metadata.json: runs are missing or extra")
 for f in files:
-    r = json.load(open(f))
+    r = json.load(open(f, encoding="utf-8"))
     if Path(f).name != f"{r['implementation']}-{r.get('scenario', 'quotes')}.json":
         sys.exit(f"result identity does not match its file name: {f}")
     if "repetitions" in meta:
@@ -60,6 +62,9 @@ def latency(reports, ph, verified=False):
     if not all(p["tick_to_frame_ms"]["n"] > 0 for p in ps):
         return "no samples"
     return f"{pm(reports, ph, 'tick_to_frame_ms', 'p50'):.1f} / {pm(reports, ph, 'tick_to_frame_ms', 'p99'):.1f}"
+def pmon(reports, ph, key, sub=None):
+    v = [(p["presentmon"][key][sub] if sub else p["presentmon"][key]) for r in reports if (p := phase(r, ph)) and "presentmon" in p]
+    return med(v) if len(v) == len(reports) else None
 def threads(reports, ph):
     acc = {}
     for r in reports:
@@ -72,18 +77,28 @@ L = [f"# NSH performance benchmark results ({os.path.basename(out)})", "",
      "Latency is from the update (or trigger) to the end of the first frame drawn after it, not physical scan-out. "
      "\"verified\" only counts a frame once the main thread has applied the commit carrying the update (NSH hosts); "
      "late frames only cover the work of the frames that were collected.", "",
-     ("Implementations: `nsh-*` run on the platform's native NSH backend (Linux: GTK 4, macOS: AppKit); `nsh-*-gpui` on nsh-platform-gpui; "
+     ("Implementations: `nsh-*` run on the platform's native NSH backend (Linux: GTK 4, macOS: AppKit, Windows: Win32 + Direct2D); `nsh-*-gpui` on nsh-platform-gpui; "
       if meta.get("nsh_backend") == "native" else
       "Implementations: this run predates the native NSH hosts, so `nsh-*` ran on nsh-platform-gpui (gpui-fast 0.1.9); ")
      + "`rust-gpui` is plain gpui-kit on gpui-fast 0.1.10. In the quotes scenario fps reflects how often each implementation redraws, not its throughput: compare CPU.", ""]
 if not memory_supported:
     L += ["Memory sampling is not implemented here; the 0 in the raw JSON is a placeholder and is shown as n/a.", ""]
+if windows:
+    L += ["Windows: CPU is QueryProcessCycleTime cycles over calibrated cycles per second; memory is the private working set "
+          "(Task Manager's Memory column). An `nsh-*` frame is one WM_PAINT (drawing plus Present(1), which can wait for the "
+          "compositor), so draw and frame work include that wait. Rows marked PresentMon come from PresentMon's record of the "
+          "same process (scripts/presentmon_join.py): frames that reached the screen, the same measure for every implementation.", ""]
 for sc, runs in data.items():
     impls = sorted(runs)
     n = len(runs[impls[0]])
     L += [f"## Scenario: {sc} ({n} run{'s' if n > 1 else ''} each)", "", "| Phase / metric | " + " | ".join(impls) + " |", "|---|" + "---|" * len(impls)]
     L.append("| Startup to first frame ms | " + " | ".join(f"{med([r['startup_first_frame_ms'] for r in runs[i]]):.0f}" for i in impls) + " |")
     L.append("| Peak memory MB | " + " | ".join((f"{med([r['peak_footprint_mb'] for r in runs[i]]):.1f}" if memory_supported else "n/a") for i in impls) + " |")
+    has_pm = any("presentmon" in p for i in impls for r in runs[i] for p in r["phases"])
+    if has_pm:
+        first = lambda rs: [x for r in rs if (x := (r.get("presentmon") or {}).get("startup_first_display_ms")) is not None]
+        L.append("| Startup to first display ms (PresentMon) | " + " | ".join(
+            f"{med(first(runs[i])):.0f}" if len(first(runs[i])) == len(runs[i]) else "no samples" for i in impls) + " |")
     for ph in [p["name"] for p in runs[impls[0]][0]["phases"] if p["name"] != "warmup"]:
         L.append(f"| **{ph}** | " + " | ".join("" for _ in impls) + " |")
         L.append("| fps | " + " | ".join(f"{pm(runs[i], ph, 'fps'):.1f}" for i in impls) + " |")
@@ -96,10 +111,17 @@ for sc, runs in data.items():
         L.append(f"| {lbl} p50 / p99 ms | " + " | ".join(latency(runs[i], ph) for i in impls) + " |")
         L.append(f"| {lbl} (verified) p50 / p99 ms | " + " | ".join(latency(runs[i], ph, True) for i in impls) + " |")
         L.append("| Late frames | " + " | ".join(f"{pm(runs[i], ph, 'late_frames'):.0f}" for i in impls) + " |")
+        if has_pm:
+            na = lambda v, f: "no samples" if v is None else f(v)
+            L.append("| Displayed fps (PresentMon) | " + " | ".join(na(pmon(runs[i], ph, "displayed_fps"), "{:.1f}".format) for i in impls) + " |")
+            L.append("| Display interval p50 / p99 ms (PresentMon) | " + " | ".join(
+                na(pmon(runs[i], ph, "display_interval_ms", "p50"), lambda v: f"{v:.1f} / {pmon(runs[i], ph, 'display_interval_ms', 'p99'):.1f}")
+                for i in impls) + " |")
+            L.append("| Late displays (PresentMon) | " + " | ".join(na(pmon(runs[i], ph, "late_displays"), "{:.0f}".format) for i in impls) + " |")
         tasks = sorted({t for i in impls for r in runs[i] if (p := phase(r, ph)) for t, _ in p.get("compute_ms", [])})
         for t in tasks:
             L.append(f"| Compute {t} p50 / p95 ms | " + " | ".join(f"{cm(runs[i], ph, t, 'p50'):.2f} / {cm(runs[i], ph, t, 'p95'):.2f}" for i in impls) + " |")
     L.append("")
 md = "\n".join(L)
-open(f"{out}/REPORT.md", "w").write(md)
+open(f"{out}/REPORT.md", "w", encoding="utf-8").write(md)
 print(md)
