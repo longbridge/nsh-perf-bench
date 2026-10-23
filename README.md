@@ -25,7 +25,7 @@ Windows 的准备与运行脚本是 PowerShell 版，另需 PresentMon，见[第
 
 ## 2. 四种写法
 
-NSH 三种写法默认跑在**本平台的原生后端**上：Linux 是 `nsh-platform-linux`（GTK 4 控件、GSK 绘制、Pango 排版），macOS 是 `nsh-platform-macos`（AppKit、Core Animation、CoreText），Windows 是 `nsh-platform-windows`（Win32 窗口、Direct2D 绘制、DirectWrite 排版）。宿主在 `nsh-app/src/native_host.rs`。同样的写法跑在 `nsh-platform-gpui` 上作为对照：`BENCH_BACKEND=gpui`，`run.sh` 里的名字是 `nsh-gpui` / `hybrid-gpui` / `rustui-gpui`，报告列名加 `-gpui`。macOS 原生宿主已在 Mac 上实测（[第 9 节](#9-macos-实测)）；macOS 与 Windows 宿主把测试窗口放在刷新率最高的屏幕上。
+NSH 三种写法默认跑在**本平台的原生后端**上：Linux 是 `nsh-platform-linux`（GTK 4 控件、GSK 绘制、Pango 排版），macOS 是 `nsh-platform-macos`（AppKit、Core Animation、CoreText），Windows 是 `nsh-platform-windows`（Win32 窗口、Direct2D 绘制、DirectWrite 排版）。宿主在 `nsh-app/src/native_host.rs`。同样的写法跑在 `nsh-platform-gpui` 上作为对照：`BENCH_BACKEND=gpui`，`run.sh` 里的名字是 `nsh-gpui` / `hybrid-gpui` / `rustui-gpui`，报告列名加 `-gpui`。macOS 原生宿主已在 Mac 上冒烟跑通，完整数据待补（[第 9 节](#9-macos-原生宿主)）；macOS 与 Windows 宿主把测试窗口放在刷新率最高的屏幕上。
 
 | `run.sh` 里的名字 | 报告列名 | 写法 | 代码 |
 |---|---|---|---|
@@ -166,25 +166,11 @@ Intel Core i7-13700KF / Linux 7.2.8 / NVIDIA RTX 3060 Ti，Hyprland 0.56.2，384
 
 旧的 Linux 结果 [linux-20261021-192842](results/linux-20261021-192842/REPORT.md) 中 NSH 跑在 GPUI Fast 后端（nsh-platform-gpui）上，且测试窗口很可能被平铺成更小尺寸，只作定性参考。任务清单见 [NSH 性能分析任务清单](docs/PERFORMANCE-ISSUES.md)。
 
-## 9. macOS 实测
+## 9. macOS 原生宿主
 
-TODO（机型 / 系统 / 屏幕刷新率）。NSH 三种写法跑在原生 AppKit 后端上，帧指标来自 `nsh-002` 补丁的帧钩子：主线程应用一次提交（含 Core Animation 提交）或原生动画的一次逐帧，算一帧。测试窗口放在刷新率最高的屏幕上（接了 60Hz 外接屏作主屏时也用内置 120Hz 屏），超时帧按该屏刷新率判定，结果 JSON 的 `refresh_hz` 记录它。
+NSH 三种写法跑在原生 AppKit 后端上，帧指标来自 `nsh-002` 补丁的帧钩子：主线程应用一次提交（含 Core Animation 提交）或原生动画的一次逐帧，算一帧，所以 fps 可能高于屏幕刷新率（同一帧里既有提交又有逐帧时算两次），比较时看 CPU 和延迟。测试窗口放在刷新率最高的屏幕上（接了 60Hz 外接屏作主屏时也用内置 120Hz 屏），超时帧按该屏刷新率判定，结果 JSON 的 `refresh_hz` 记录它。
 
-| 指标 | 纯 TSX | TSX + Rust | NSH Rust | 纯 GPUI Fast |
-|---|---:|---:|---:|---:|
-| 每秒 1000 条行情：CPU | TODO | TODO | TODO | TODO |
-| 每秒 2 万条行情：CPU | TODO | TODO | TODO | TODO |
-| 同阶段推送→上屏 | TODO | TODO | TODO | TODO |
-| 5000 条/秒并滚动：CPU | TODO | TODO | TODO | TODO |
-| 1000 方块逻辑逐帧动画：CPU | TODO | TODO | TODO | TODO |
-| 1000 方块原生动画：CPU | TODO | TODO | TODO | TODO |
-| 选中行→上屏 | TODO | TODO | TODO | TODO |
-| 切换页签→上屏 | TODO | TODO | TODO | TODO |
-| 5 万条过滤→上屏 | TODO | TODO | TODO | TODO |
-| 10 万条排序 | TODO | TODO | TODO | TODO |
-| 峰值内存 | TODO | TODO | TODO | TODO |
-
-完整报告：TODO（`results/<时间>/REPORT.md`）。
+目前只在 Apple 芯片的 Mac（内置 120Hz 屏 + 60Hz 外接屏）上跑通了冒烟（`BENCH_QUICK=1 SCENARIOS=quotes IMPLS="nsh rust" scripts/run.sh 1`，两种写法都记录 `refresh_hz=120`）；3 次完整运行的数据待补。
 
 ## 10. Windows 运行与实测
 
@@ -237,7 +223,7 @@ Intel Core i7-11800H / Windows 11 Pro / NVIDIA RTX 3050 Laptop + Intel UHD，测
 | 启动到首次显示（PresentMon，行情场景） | 211 ms | 217 ms | 209 ms | 13747 ms |
 | 峰值内存（行情场景） | 69.9 MB | 77.3 MB | **50.2 MB** | 72.7 MB |
 
-- 动画场景 `nsh-*` 只有 1–2 fps：`nsh-platform-windows` 给每个 `opacity < 1` 的 view 推一个 `contentBounds` 无界的 Direct2D layer，每个小方块都要清空并混合一张窗口大小的离屏表面，内存同时涨到约 250–270 MB。限定 layer 范围后同一场景回到 60 fps，修复准备提交给 NSH。
+- 动画场景 `nsh-*` 只有 1–2 fps：`nsh-platform-windows` 给每个 `opacity < 1` 的 view 推一个 `contentBounds` 无界的 Direct2D layer，每个小方块都要清空并混合一张窗口大小的离屏表面，内存同时涨到约 250–270 MB。限定 layer 范围后同一场景回到 60 fps，修复见 NSH [#408](https://github.com/longbridge/nsh/pull/408)。
 - 持续推送下 `nsh-*` 的推送→上屏约 25 ms（每秒 200 条起即如此），纯 GPUI Fast 约 11 ms；`nsh-*` 的帧计时含 `Present(1)` 的等待，见上表口径。
 - 纯 GPUI Fast 首次显示慢（3.6–18.9 s）是启动时编译着色器；`nsh-*` 约 0.2 s。
 
